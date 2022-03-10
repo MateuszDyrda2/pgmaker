@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.22)
+
+set(pgmaker_VERSION_MAJOR 0)
+set(pgmaker_VERSION_MINOR 1)
+set(pgmaker_VERSION_PATCH 0)
+
+set(pgmaker_VERSION ${pgmaker_VERSION_MAJOR}.${pgmaker_VERSION_MINOR}.${pgmaker_VERSION_PATCH})
+
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+
+find_package(glfw3 REQUIRED)
+find_package(glm REQUIRED)
+find_package(FFmpeg COMPONENTS AVCODEC AVDEVICE AVFORMAT AVUTIL SWSCALE REQUIRED)
+
+add_subdirectory(lib/glad) # opengl loader
+
+project(pgmaker VERSION ${pgmaker_VERSION} LANGUAGES CXX C)
+
+set(FFMPEG_LIBS
+	${AVFORMAT_LIBRARIES}
+	${AVCODEC_LIBRARIES}
+	${AVDEVICE_LIBRARIES}
+	${AVUTIL_LIBRARIES}
+	${SWSCALE_LIBRARIES}
+)
+set(FFMPEG_INCLUDE
+	${AVFORMAT_INCLUDE_DIRS}
+	${AVCODEC_INCLUDE_DIRS}
+	${AVUTILS_INCLUDE_DIRS}
+	${AVDEVICE_INCLUDE_DIRS}
+	${SWSCALE_INCLUDE_DIRS}
+)
+
+set_property(TARGET pgmaker PROPERTY CXX_STANDARD 11)
+set_property(TARGET pgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
+
+target_compile_definitions(pgmaker PRIVATE SHADER_PATH="${CMAKE_CURRENT_SOURCE_DIR}/shaders/")
