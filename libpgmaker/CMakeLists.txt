@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.22)
 set(libpgmaker_VERSION ${pgmaker_VERSION})
 
 find_package(FFmpeg COMPONENTS AVCODEC AVDEVICE AVFORMAT AVUTIL SWSCALE REQUIRED)
+find_package(glm REQUIRED)
+find_package(OpenAL REQUIRED)
+add_subdirectory(lib/glad)
 
 project(libpgmaker VERSION ${libpgmaker_VERSION} LANGUAGES CXX C)
 
@@ -33,7 +36,10 @@ target_include_directories(libpgmaker
 target_link_libraries(libpgmaker
 	PUBLIC
 	${FFMPEG_LIBS}
+	${OPENAL_LIBRARY}
+	glad
+	glm
 )
 
-set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 11)
+set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
