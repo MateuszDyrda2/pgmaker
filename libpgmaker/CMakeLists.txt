@@ -23,7 +23,8 @@ set(FFMPEG_INCLUDE
 )
 
 set(libpgmaker_SRC
-
+	src/video.cpp
+	src/video_reader.cpp
 )
 add_library(libpgmaker ${libpgmaker_SRC})
 
@@ -43,3 +44,12 @@ target_link_libraries(libpgmaker
 
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
+
+option(libpgmaker_BUILDSANDBOX "Build sandbox for library" ON)
+
+if(libpgmaker_BUILDSANDBOX)
+	message("Building sandbox")
+	find_package(glfw3 REQUIRED)
+	add_executable(libpgmaker_sandbox sandbox/main.cpp)
+	target_link_libraries(libpgmaker_sandbox PUBLIC libpgmaker glfw)
+endif()
