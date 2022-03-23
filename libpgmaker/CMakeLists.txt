@@ -13,10 +13,10 @@ if(NOT ${FFmpeg_FOUND})
 	FetchContent_MakeAvailable(FFmpeg)
 endif()
 
-find_package(glm )
+find_package(GLM)
 if(NOT ${glm_FOUND})
 	FetchContent_Declare(
-		glm
+		GLM
 		GIT_REPOSITORY https://github.com/g-truc/glm.git
 	)
 	FetchContent_MakeAvailable(glm)
@@ -63,7 +63,7 @@ target_link_libraries(libpgmaker
 	${FFMPEG_LIBS}
 	${OPENAL_LIBRARY}
 	glad
-	glm
+	GLM
 )
 
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
