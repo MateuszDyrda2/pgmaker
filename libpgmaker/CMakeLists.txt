@@ -2,9 +2,33 @@ cmake_minimum_required(VERSION 3.22)
 
 set(libpgmaker_VERSION ${pgmaker_VERSION})
 
-find_package(FFmpeg COMPONENTS AVCODEC AVDEVICE AVFORMAT AVUTIL SWSCALE REQUIRED)
-find_package(glm REQUIRED)
-find_package(OpenAL REQUIRED)
+include(FetchContent)
+
+find_package(FFmpeg COMPONENTS AVCODEC AVDEVICE AVFORMAT AVUTIL SWSCALE)
+if(NOT ${FFmpeg_FOUND})
+	FetchContent_Declare(
+		FFmpeg
+		GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
+	)
+	FetchContent_MakeAvailable(FFmpeg)
+endif()
+
+find_package(glm )
+if(NOT ${glm_FOUND})
+	FetchContent_Declare(
+		glm
+		GIT_REPOSITORY https://github.com/g-truc/glm.git
+	)
+	FetchContent_MakeAvailable(glm)
+endif()
+find_package(OpenAL)
+if(NOT ${OpenAL_FOUND})
+	FetchContent_Declare(
+		OpenAL
+		GIT_REPOSITORY https://github.com/kcat/openal-soft.git
+	)
+	FetchContent_MakeAvailable(OpenAL)
+endif()
 add_subdirectory(lib/glad)
 
 project(libpgmaker VERSION ${libpgmaker_VERSION} LANGUAGES CXX C)
