@@ -1,11 +1,26 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.21)
 
 set(libpgmaker_VERSION ${pgmaker_VERSION})
 
 include(FetchContent)
 include(ExternalProject)
 
-find_package(FFmpeg COMPONENTS AVCODEC AVDEVICE AVFORMAT AVUTIL SWSCALE)
+
+set(FFMPEG_DIRECTORY "C:/ffmpeg/" CACHE STRING "Where to find ffmpeg" FORCE)
+if(WIN32)
+        set(PC_SWSCALE_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
+        set(PC_AVUTIL_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
+        set(PC_AVFORMAT_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
+        set(PC_AVCODEC_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
+
+        set(PC_SWSCALE_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
+        set(PC_AVUTIL_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
+        set(PC_AVFORMAT_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
+        set(PC_AVCODEC_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
+endif()
+
+find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE REQUIRED)
+
 
 find_package(glm)
 if(NOT ${glm_FOUND})
@@ -47,23 +62,30 @@ set(libpgmaker_SRC
 add_library(libpgmaker ${libpgmaker_SRC})
 
 target_include_directories(libpgmaker 
-	PUBLIC 
+        PUBLIC
 	include/
 	PRIVATE
 	${FFMPEG_INCLUDE}
 )
+if(WIN32)
+    set(GLM_LIB glm::glm)
+    set(OPENAL_LIB OpenAL)
+else()
+    set(GLM_LIB glm)
+    set(OPENAL_LIB ${OPENAL_LIBRARY})
+endif()
 target_link_libraries(libpgmaker
 	PUBLIC
 	${FFMPEG_LIBS}
-	${OPENAL_LIBRARY}
+        ${OPENAL_LIB}
 	glad
-	glm
+        ${GLM_LIB}
 )
 
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
 
-option(libpgmaker_BUILDSANDBOX "Build sandbox for library" ON)
+option(libpgmaker_BUILDSANDBOX "Build sandbox for library" OFF)
 
 if(libpgmaker_BUILDSANDBOX)
 	find_package(glfw3)

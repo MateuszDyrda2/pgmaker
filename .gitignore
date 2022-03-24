@@ -6,3 +6,4 @@ build/
 .vs/
 #cmake generated
 CMakeLists.txt.user
+CMakeSettings.json

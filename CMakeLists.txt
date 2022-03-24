@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.21)
 
 set(pgmaker_VERSION_MAJOR 0)
 set(pgmaker_VERSION_MINOR 1)
