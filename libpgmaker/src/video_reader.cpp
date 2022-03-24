@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include <cstdint>
+
 namespace libpgmaker {
 using namespace std;
 video_reader::video_reader()
@@ -17,30 +19,81 @@ std::unique_ptr<video> video_reader::load_file(const std::string& path)
     {
         throw runtime_error("Couldn't allocate format context\n");
     }
+    // Open the file
     if(avformat_open_input(&avFormatContext, path.c_str(), NULL, NULL) != 0)
     {
         throw runtime_error("Couldn't open input for file: " + path);
     }
-    int videoStreamIndex = -1, audioStreamIndex = -1;
-    AVCodecParameters* avCodecParams;
-    AVCodec* avCodec;
-    for(size_t i = 0; i < avFormatContext->nb_streams; ++i)
+    // Retrieve stream information
+    if(avformat_find_stream_info(avFormatContext, NULL) < 0)
     {
-        avCodecParams = avFormatContext->streams[i]->codecpar;
-        avCodec       = const_cast<AVCodec*>(avcodec_find_decoder(avCodecParams->codec_id));
-        if(!avCodec) continue;
-        if(avCodec->type == AVMEDIA_TYPE_VIDEO)
+        // Couldn't find stream information
+        throw runtime_error("Couldn't find stream information");
+    }
+    av_dump_format(avFormatContext, 0, path.c_str(), 0);
+
+    int videoStream = -1;
+    int audioStream = -1;
+    int width, height;
+    AVCodecParameters* codecParams = nullptr;
+    for(int i = 0; i < avFormatContext->nb_streams; ++i)
+    {
+        auto streams = avFormatContext->streams[i];
+        if(streams->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
-            videoStreamIndex = i;
+            videoStream = i;
+            width       = streams->codecpar->width;
+            height      = streams->codecpar->height;
+            codecParams = streams->codecpar;
         }
-        else if(avCodec->type == AVMEDIA_TYPE_AUDIO)
+        if(streams->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
-            audioStreamIndex = i;
+            audioStream = i;
         }
     }
-    if(videoStreamIndex == -1)
+    if(videoStream == -1 || audioStream == -1)
     {
-        throw runtime_error("Couldn't find video stream in file");
+        throw runtime_error("Didn't find a video stream");
     }
+    const AVCodec* pCodec =
+        avcodec_find_decoder(codecParams->codec_id);
+    if(pCodec == NULL)
+    {
+        throw runtime_error("Unsupported codec");
+    }
+    AVCodecContext* pCodecCtx = avcodec_alloc_context3(pCodec);
+    if(avcodec_parameters_to_context(pCodecCtx, codecParams) < 0)
+    {
+        throw runtime_error("Could not pass parameters to codec");
+    }
+    if(avcodec_open2(pCodecCtx, pCodec, NULL) < 0)
+    {
+        throw runtime_error("Could not open codec");
+    }
+
+    AVFrame* pFrame = av_frame_alloc();
+    if(!pFrame)
+    {
+        throw runtime_error("Failed to allocate a frame");
+    }
+    AVPacket* pPacket = av_packet_alloc();
+    if(!pPacket)
+    {
+        throw runtime_error("Failed to allocate a packet");
+    }
+
+    video_state state;
+    state.width            = width;
+    state.height           = height;
+    state.avFormatContext  = avFormatContext;
+    state.avCodecContext   = pCodecCtx;
+    state.videoStreamIndex = videoStream;
+    state.avFrame          = pFrame;
+    state.avPacket         = pPacket;
+    state.timeBase         = avFormatContext->streams[videoStream]->time_base;
+
+    auto vid = std::make_unique<video>(state);
+    // vid->thumbnail = std::move(buffer);
+    return vid;
 }
 } // namespace libpgmaker
