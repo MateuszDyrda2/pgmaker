@@ -65,4 +65,60 @@ thumbnail video::get_thumbnail(std::uint32_t width, std::uint32_t height)
 
     return thumbnail{ width, height, std::move(buffer) };
 }
+void video::tick_frame()
+{
+    auto& avFormatContext  = state.avFormatContext;
+    auto& avCodecContext   = state.avCodecContext;
+    auto& avFrame          = state.avFrame;
+    auto& avPacket         = state.avPacket;
+    auto& videoStreamIndex = state.videoStreamIndex;
+    if(!state.swsScalerContext)
+    {
+        state.swsScalerContext = sws_getContext(state.width, state.height, avCodecContext->pix_fmt,
+                                                state.width, state.height, AV_PIX_FMT_RGB0,
+                                                SWS_BILINEAR, NULL, NULL, NULL);
+        if(!state.swsScalerContext)
+        {
+            throw runtime_error("Could not initialize swscaler");
+        }
+    }
+    if(!data.data)
+    {
+        data.data   = std::make_unique<std::uint8_t[]>(state.width * state.height * 4);
+        data.width  = state.width;
+        data.height = state.height;
+    }
+    auto& swsScalerContext = state.swsScalerContext;
+    while(av_read_frame(avFormatContext, avPacket) >= 0)
+    {
+        if(avPacket->stream_index != videoStreamIndex)
+        {
+            av_packet_unref(avPacket);
+            continue;
+        }
+        if(avcodec_send_packet(avCodecContext, avPacket) < 0)
+        {
+            throw runtime_error("Failed to decode packet");
+        }
+        if(int response = avcodec_receive_frame(avCodecContext, avFrame);
+           response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+        {
+            av_packet_unref(avPacket);
+            continue;
+        }
+        else if(response < 0)
+        {
+            throw runtime_error("Failed to decode packet");
+        }
+        av_packet_unref(avPacket);
+        break;
+    }
+    // presentation timestamp
+    int pts = avFrame->pts;
+
+    std::uint8_t* dest[4] = { data.data.get(), NULL, NULL, NULL };
+    int destLineSize[4]   = { avFrame->width * 4, 0, 0, 0 };
+    sws_scale(swsScalerContext, avFrame->data, avFrame->linesize,
+              0, avFrame->height, dest, destLineSize);
+}
 } // namespace libpgmaker

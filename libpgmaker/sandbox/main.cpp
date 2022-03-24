@@ -9,6 +9,7 @@
 
 #include <iostream>
 
+#include <libpgmaker/textureGL.h>
 #include <libpgmaker/video_reader.h>
 
 static glm::ivec2 windowSize{ 1080, 720 };
@@ -129,33 +130,31 @@ int main()
     auto vid = reader.load_file("/home/matzix/shared/PGMaker/libpgmaker/data/1232.mp4");
     auto tn  = vid->get_thumbnail(vid->get_state().width / 4, vid->get_state().height / 4);
 
-    GLuint textureHandle;
-    glGenTextures(1, &textureHandle);
-    glBindTexture(GL_TEXTURE_2D, textureHandle);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                 tn.width, tn.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tn.data.get());
-    // ###############################################################
-
-    while(!glfwWindowShouldClose(window))
     {
-        glViewport(0, 0, windowSize.x, windowSize.y);
-        glClearColor(0.5f, 0.f, 0.5f, 1.f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        textureGL tex(vid->get_state().width, vid->get_state().height);
+        // ###############################################################
+        while(!glfwWindowShouldClose(window))
+        {
+            glViewport(0, 0, windowSize.x, windowSize.y);
+            glClearColor(0.5f, 0.f, 0.5f, 1.f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 viewProj = glm::ortho(float(windowSize.x) * -0.5f, float(windowSize.x * 0.5f),
-                                        float(windowSize.y) * 0.5f, float(windowSize.y) * -0.5f);
-        viewProj           = glm::scale(viewProj, glm::vec3(float(tn.width), float(tn.height), 1.f));
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+            glm::mat4 viewProj = glm::ortho(float(windowSize.x) * -0.5f, float(windowSize.x * 0.5f),
+                                            float(windowSize.y) * 0.5f, float(windowSize.y) * -0.5f);
+            viewProj           = glm::scale(viewProj,
+                                            glm::vec3(float(vid->get_data().width), float(vid->get_data().height), 1.f));
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
 
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+            vid->tick_frame();
+            tex.update_data(vid->get_data().data.get());
+
+            tex.bind();
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            tex.unbind();
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+        }
     }
-
     glfwDestroyWindow(window);
     glfwTerminate();
 }

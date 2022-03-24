@@ -58,6 +58,7 @@ set(FFMPEG_INCLUDE
 set(libpgmaker_SRC
 	src/video.cpp
 	src/video_reader.cpp
+	src/textureGL.cpp
 )
 add_library(libpgmaker ${libpgmaker_SRC})
 
