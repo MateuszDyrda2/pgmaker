@@ -3,20 +3,14 @@ cmake_minimum_required(VERSION 3.22)
 set(libpgmaker_VERSION ${pgmaker_VERSION})
 
 include(FetchContent)
+include(ExternalProject)
 
 find_package(FFmpeg COMPONENTS AVCODEC AVDEVICE AVFORMAT AVUTIL SWSCALE)
-if(NOT ${FFmpeg_FOUND})
-	FetchContent_Declare(
-		FFmpeg
-		GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
-	)
-	FetchContent_MakeAvailable(FFmpeg)
-endif()
 
-find_package(GLM)
+find_package(glm)
 if(NOT ${glm_FOUND})
 	FetchContent_Declare(
-		GLM
+		glm
 		GIT_REPOSITORY https://github.com/g-truc/glm.git
 	)
 	FetchContent_MakeAvailable(glm)
@@ -63,17 +57,24 @@ target_link_libraries(libpgmaker
 	${FFMPEG_LIBS}
 	${OPENAL_LIBRARY}
 	glad
-	GLM
+	glm
 )
 
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
 
-option(libpgmaker_BUILDSANDBOX "Build sandbox for library" OFF)
+option(libpgmaker_BUILDSANDBOX "Build sandbox for library" ON)
 
 if(libpgmaker_BUILDSANDBOX)
+	find_package(glfw3)
 	message("Building sandbox")
-	find_package(glfw3 REQUIRED)
+	if(NOT glfw3_FOUND)
+		FetchContent_Declare(
+			glfw
+			GIT_REPOSITORY https://github.com/glfw/glfw.git
+		)
+		FetchContent_MakeAvailable(glfw)
+	endif()
 	add_executable(libpgmaker_sandbox sandbox/main.cpp)
 	target_link_libraries(libpgmaker_sandbox PUBLIC libpgmaker glfw)
 endif()
