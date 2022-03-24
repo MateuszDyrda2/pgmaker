@@ -6,6 +6,7 @@ extern "C"
 #include <libswscale/swscale.h>
 }
 
+#include <cstdint>
 #include <memory>
 
 namespace libpgmaker {
@@ -25,21 +26,27 @@ struct video_state
 struct video_data
 {
 };
+struct thumbnail
+{
+    std::uint32_t width, height;
+    std::unique_ptr<std::uint8_t[]> data;
+};
 class video
 {
   public:
+    video() = default;
     video(const video_state& state);
     ~video();
 
+    void allocate_thumbnail(int width, int height);
     const video_data& get_data() const { return data; }
     const video_state& get_state() const { return state; }
 
-    const std::shared_ptr<unsigned char[]> get_thumbnail() const { return thumbnail; }
+    thumbnail get_thumbnail(std::uint32_t width, std::uint32_t height);
 
   private:
     video_data data;
     video_state state;
-
-    std::shared_ptr<unsigned char[]> thumbnail;
+    friend class video_reader;
 };
 } // namespace libpgmaker
