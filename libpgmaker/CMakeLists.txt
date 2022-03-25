@@ -54,19 +54,22 @@ set(FFMPEG_INCLUDE
 	${AVUTILS_INCLUDE_DIRS}
 	${SWSCALE_INCLUDE_DIRS}
 )
+find_package(Boost COMPONENTS thread system REQUIRED)
 
 set(libpgmaker_SRC
 	src/video.cpp
 	src/video_reader.cpp
 	src/textureGL.cpp
+	src/channel.cpp
 )
 add_library(libpgmaker ${libpgmaker_SRC})
 
 target_include_directories(libpgmaker 
-        PUBLIC
+    PUBLIC
 	include/
 	PRIVATE
 	${FFMPEG_INCLUDE}
+	${Boost_INCLUDE_DIRS}
 )
 if(WIN32)
     set(GLM_LIB glm::glm)
@@ -78,9 +81,10 @@ endif()
 target_link_libraries(libpgmaker
 	PUBLIC
 	${FFMPEG_LIBS}
-        ${OPENAL_LIB}
+    ${OPENAL_LIB}
 	glad
-        ${GLM_LIB}
+    ${GLM_LIB}
+	${Boost_LIBRARIES}
 )
 
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
