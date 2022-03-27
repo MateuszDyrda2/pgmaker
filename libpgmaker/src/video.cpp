@@ -66,7 +66,7 @@ thumbnail video::get_thumbnail(std::uint32_t width, std::uint32_t height)
 
     return thumbnail{ width, height, std::move(buffer) };
 }
-void video::tick_frame()
+int video::tick_frame()
 {
     auto& avFormatContext  = state.avFormatContext;
     auto& avCodecContext   = state.avCodecContext;
@@ -121,5 +121,6 @@ void video::tick_frame()
     int destLineSize[4]   = { avFrame->width * 4, 0, 0, 0 };
     sws_scale(swsScalerContext, avFrame->data, avFrame->linesize,
               0, avFrame->height, dest, destLineSize);
+    return pts;
 }
 } // namespace libpgmaker

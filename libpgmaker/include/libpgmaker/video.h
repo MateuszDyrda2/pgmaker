@@ -43,7 +43,7 @@ class video
     void allocate_thumbnail(int width, int height);
     const video_data& get_data() const { return data; }
     const video_state& get_state() const { return state; }
-    void tick_frame();
+    int tick_frame();
 
     thumbnail get_thumbnail(std::uint32_t width, std::uint32_t height);
 

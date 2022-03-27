@@ -7,7 +7,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 #include <libpgmaker/textureGL.h>
 #include <libpgmaker/video_reader.h>
@@ -129,10 +131,11 @@ int main()
     video_reader reader;
     auto vid = reader.load_file("/home/matzix/shared/PGMaker/libpgmaker/data/1232.mp4");
     auto tn  = vid->get_thumbnail(vid->get_state().width / 4, vid->get_state().height / 4);
-
     {
         textureGL tex(vid->get_state().width, vid->get_state().height);
         // ###############################################################
+        using namespace std::chrono;
+        std::chrono::high_resolution_clock::time_point startTime;
         while(!glfwWindowShouldClose(window))
         {
             glViewport(0, 0, windowSize.x, windowSize.y);
@@ -145,7 +148,21 @@ int main()
                                             glm::vec3(float(vid->get_data().width), float(vid->get_data().height), 1.f));
             glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
 
-            vid->tick_frame();
+            int pts                = vid->tick_frame();
+            double ptInSeconds     = pts * (double)vid->get_state().timeBase.num / (double)vid->get_state().timeBase.den;
+            auto dur               = duration_cast<high_resolution_clock::duration>(duration<double>(ptInSeconds));
+            static bool firstFrame = true;
+            if(firstFrame)
+            {
+                firstFrame = false;
+                startTime  = high_resolution_clock::now();
+            }
+            auto now = high_resolution_clock::now();
+            if((now - startTime) <= dur)
+            {
+                std::this_thread::sleep_for(dur - (now - startTime));
+            }
+
             tex.update_data(vid->get_data().data.get());
 
             tex.bind();
