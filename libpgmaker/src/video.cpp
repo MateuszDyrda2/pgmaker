@@ -45,6 +45,7 @@ thumbnail video::get_thumbnail(std::uint32_t width, std::uint32_t height)
             throw runtime_error("Failed to decode a packet");
         }
         av_packet_unref(avPacket);
+        break;
     }
     SwsContext* swsScalerCtx = sws_getContext(state.width, state.height, avCodecContext->pix_fmt,
                                               width, height, AV_PIX_FMT_RGB0,
