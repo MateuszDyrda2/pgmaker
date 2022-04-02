@@ -44,13 +44,11 @@ frame* channel::get_frame(const std::chrono::milliseconds& delta)
         auto currentFrame = nextFrame;
         while(beg > nextFrameTimestamp)
         {
-            delete currentFrame;
             currentFrame = nextFrame;
             if(!frameQueue.pop(nextFrame))
                 break;
             nextFrameTimestamp = nextFrame->timestamp;
         }
-        delete previousFrame;
         previousFrame = currentFrame;
     }
     std::cout << beg.count() << " and " << previousFrame->timestamp.count() << '\n';
