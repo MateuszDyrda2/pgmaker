@@ -9,6 +9,7 @@
 
 #include <iostream>
 
+#include <libpgmaker/channel.h>
 #include <libpgmaker/textureGL.h>
 #include <libpgmaker/video_reader.h>
 
@@ -128,13 +129,18 @@ int main()
 
     video_reader reader;
     auto vid = reader.load_file("/home/matzix/shared/PGMaker/libpgmaker/data/1232.mp4");
-    auto tn  = vid->get_thumbnail(vid->get_state().width / 4, vid->get_state().height / 4);
+    // auto tn  = vid->get_thumbnail(vid->get_state().width / 4, vid->get_state().height / 4);
 
     {
-        textureGL tex(vid->get_state().width, vid->get_state().height);
+        textureGL tex(vid->get_info().width, vid->get_info().height);
+        channel ch;
+        ch.add_clip(vid, std::chrono::milliseconds(0));
         // ###############################################################
+        using namespace std::chrono;
+        high_resolution_clock::time_point tp;
         while(!glfwWindowShouldClose(window))
         {
+            static bool isFirst = true;
             glViewport(0, 0, windowSize.x, windowSize.y);
             glClearColor(0.5f, 0.f, 0.5f, 1.f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -142,11 +148,19 @@ int main()
             glm::mat4 viewProj = glm::ortho(float(windowSize.x) * -0.5f, float(windowSize.x * 0.5f),
                                             float(windowSize.y) * 0.5f, float(windowSize.y) * -0.5f);
             viewProj           = glm::scale(viewProj,
-                                            glm::vec3(float(vid->get_data().width), float(vid->get_data().height), 1.f));
+                                            glm::vec3(float(vid->get_info().width), float(vid->get_info().height), 1.f));
             glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
 
-            vid->tick_frame();
-            tex.update_data(vid->get_data().data.get());
+            if(isFirst)
+            {
+                isFirst = false;
+                tp      = high_resolution_clock::now();
+            }
+            auto now   = high_resolution_clock::now();
+            auto delta = duration_cast<milliseconds>(now - tp);
+            tp         = now;
+            auto fr    = ch.get_frame(delta);
+            tex.update_data(fr->data.get());
 
             tex.bind();
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);

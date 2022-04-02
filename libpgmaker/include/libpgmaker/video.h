@@ -6,6 +6,7 @@ extern "C"
 #include <libswscale/swscale.h>
 }
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 
@@ -17,16 +18,10 @@ struct video_state
     // internal state
     AVFormatContext* avFormatContext{};
     AVCodecContext* avCodecContext{};
-    int videoStreamIndex{};
-    AVFrame* avFrame{};
-    AVPacket* avPacket{};
+    int videoStreamIndex{ -1 };
+    int audioStreamIndex{ -1 };
     SwsContext* swsScalerContext{};
     AVRational timeBase;
-};
-struct video_data
-{
-    std::uint32_t width, height;
-    std::unique_ptr<std::uint8_t[]> data;
 };
 struct thumbnail
 {
@@ -45,27 +40,20 @@ class video
 {
   public:
     video() = default;
-    video(const video_state& state);
+    video(const video_state& state, const video_info& info);
     ~video();
 
     void jump2(std::chrono::milliseconds timestamp);
     void read1packet();
 
     void allocate_thumbnail(int width, int height);
-    const video_data& get_data() const { return data; }
     const video_state& get_state() const { return state; }
-    void tick_frame();
+    const video_info& get_info() const { return information; }
 
     thumbnail get_thumbnail(std::uint32_t width, std::uint32_t height);
 
   private:
-    video_data data;
     video_state state;
-
-    AVFormatContext* avFormatContext;
-    AVCodecContext* avCodecContext;
-    SwsContext* swsContext;
-    std::uint8_t videoStreamIndex;
     video_info information;
 
     friend class video_reader;
