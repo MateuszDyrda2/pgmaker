@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 3.21)
 
 set(libpgmaker_VERSION ${pgmaker_VERSION})
 
-include(FetchContent)
-include(ExternalProject)
-
 set(FFMPEG_DIRECTORY "C:/ffmpeg/" CACHE STRING "Where to find ffmpeg" FORCE)
 
 find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE)
@@ -67,15 +64,13 @@ target_include_directories(libpgmaker
 )
 if(WIN32)
     set(GLM_LIB glm::glm)
-    set(OPENAL_LIB OpenAL)
 else()
     set(GLM_LIB glm)
-    set(OPENAL_LIB ${OPENAL_LIBRARY})
 endif()
 target_link_libraries(libpgmaker
 	PUBLIC
 	${FFMPEG_LIBS}
-    ${OPENAL_LIB}
+    ${OPENAL_LIBRARY}
 	glad
     ${GLM_LIB}
 	${Boost_LIBRARIES}
