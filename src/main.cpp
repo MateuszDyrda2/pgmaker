@@ -5,7 +5,7 @@ int main(int argc, char** argv)
 {
     QGuiApplication app(argc, argv);
 
-    QQmlApplicationEngine engine(":/qml/MainWindow");
+    QQmlApplicationEngine engine(QUrl("qrc:/qml/MainWindow"));
 
     return app.exec();
 }

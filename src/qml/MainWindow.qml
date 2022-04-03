@@ -1,4 +1,5 @@
-import QtQuick 2.6
+import QtQuick 2.9
+import QtQuick.Window 2.3
 import QtQuick.Controls 2.5
 import QtQuick.Dialogs
 
@@ -24,6 +25,7 @@ Window {
             console.log("Canceled")
         }
     }
+
 
     Button {
         id: importVideoButton
@@ -65,6 +67,12 @@ Window {
         height: 16
         text: qsTr("Selected file")
         font.pixelSize: 12
+    }
+
+    TaskBarButton {
+        id: dhsh
+        x: 286
+        y: 177
     }
 
 }
