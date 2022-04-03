@@ -5,9 +5,11 @@ set(libpgmaker_VERSION ${pgmaker_VERSION})
 include(FetchContent)
 include(ExternalProject)
 
-
 set(FFMPEG_DIRECTORY "C:/ffmpeg/" CACHE STRING "Where to find ffmpeg" FORCE)
-if(WIN32)
+
+find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE)
+if(NOT ${FFMPEG_FOUND})
+	if(WIN32)	
         set(PC_SWSCALE_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
         set(PC_AVUTIL_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
         set(PC_AVFORMAT_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
@@ -17,27 +19,17 @@ if(WIN32)
         set(PC_AVUTIL_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
         set(PC_AVFORMAT_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
         set(PC_AVCODEC_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
+		find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE REQUIRED)
+	else()
+		message(FATAL_ERROR "Make sure the ffmpeg library is installed")
+	endif()
 endif()
 
-find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE REQUIRED)
 
 
-find_package(glm)
-if(NOT ${glm_FOUND})
-	FetchContent_Declare(
-		glm
-		GIT_REPOSITORY https://github.com/g-truc/glm.git
-	)
-	FetchContent_MakeAvailable(glm)
-endif()
-find_package(OpenAL)
-if(NOT ${OpenAL_FOUND})
-	FetchContent_Declare(
-		OpenAL
-		GIT_REPOSITORY https://github.com/kcat/openal-soft.git
-	)
-	FetchContent_MakeAvailable(OpenAL)
-endif()
+find_package(glm REQUIRED)
+find_package(OpenAL REQUIRED)
+
 add_subdirectory(lib/glad)
 
 project(libpgmaker VERSION ${libpgmaker_VERSION} LANGUAGES CXX C)
@@ -61,6 +53,8 @@ set(libpgmaker_SRC
 	src/video_reader.cpp
 	src/textureGL.cpp
 	src/channel.cpp
+	src/timeline.cpp
+	src/preview.cpp
 )
 add_library(libpgmaker ${libpgmaker_SRC})
 
@@ -93,15 +87,8 @@ set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
 option(libpgmaker_BUILDSANDBOX "Build sandbox for library" OFF)
 
 if(libpgmaker_BUILDSANDBOX)
-	find_package(glfw3)
+	find_package(glfw3 REQUIRED)
 	message("Building sandbox")
-	if(NOT glfw3_FOUND)
-		FetchContent_Declare(
-			glfw
-			GIT_REPOSITORY https://github.com/glfw/glfw.git
-		)
-		FetchContent_MakeAvailable(glfw)
-	endif()
 	add_executable(libpgmaker_sandbox sandbox/main.cpp)
 	target_link_libraries(libpgmaker_sandbox PUBLIC libpgmaker glfw)
 endif()

@@ -12,6 +12,6 @@ class video_reader
     video_reader();
     ~video_reader();
 
-    std::unique_ptr<video> load_file(const std::string& path);
+    std::shared_ptr<video> load_file(const std::string& path);
 };
 } // namespace libpgmaker

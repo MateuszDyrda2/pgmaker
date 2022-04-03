@@ -12,7 +12,7 @@ video_reader::video_reader()
 video_reader::~video_reader()
 {
 }
-std::unique_ptr<video> video_reader::load_file(const std::string& path)
+std::shared_ptr<video> video_reader::load_file(const std::string& path)
 {
     AVFormatContext* avFormatContext = avformat_alloc_context();
     if(!avFormatContext)
@@ -70,17 +70,9 @@ std::unique_ptr<video> video_reader::load_file(const std::string& path)
     {
         throw runtime_error("Could not open codec");
     }
-
-    AVFrame* pFrame = av_frame_alloc();
-    if(!pFrame)
-    {
-        throw runtime_error("Failed to allocate a frame");
-    }
-    AVPacket* pPacket = av_packet_alloc();
-    if(!pPacket)
-    {
-        throw runtime_error("Failed to allocate a packet");
-    }
+    SwsContext* swsCtx = sws_getContext(width, height, pCodecCtx->pix_fmt,
+                                        width, height, AV_PIX_FMT_RGB0,
+                                        SWS_BILINEAR, NULL, NULL, NULL);
 
     video_state state;
     state.width            = width;
@@ -88,12 +80,14 @@ std::unique_ptr<video> video_reader::load_file(const std::string& path)
     state.avFormatContext  = avFormatContext;
     state.avCodecContext   = pCodecCtx;
     state.videoStreamIndex = videoStream;
-    state.avFrame          = pFrame;
-    state.avPacket         = pPacket;
+    state.audioStreamIndex = audioStream;
+    state.swsScalerContext = swsCtx;
     state.timeBase         = avFormatContext->streams[videoStream]->time_base;
 
-    auto vid = std::make_unique<video>(state);
-    // vid->thumbnail = std::move(buffer);
-    return vid;
+    video_info info;
+    info.width  = width;
+    info.height = height;
+
+    return std::make_shared<video>(state, info);
 }
 } // namespace libpgmaker
