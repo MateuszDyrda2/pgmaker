@@ -20,6 +20,8 @@ add_subdirectory(libpgmaker)
 set(pgmaker_SRC
 	src/main.cpp
         pgmaker.qrc
+        src/backendintegration.h
+        src/backendintegration.cpp
 )
 
 qt_add_executable(pgmaker ${pgmaker_SRC})
