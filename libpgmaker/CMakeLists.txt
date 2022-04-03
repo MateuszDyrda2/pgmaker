@@ -23,7 +23,7 @@ if(NOT ${FFMPEG_FOUND})
 endif()
 
 
-find_package(OpenAL REQUIRED)
+find_package(OpenAL)
 
 add_subdirectory(lib/glad)
 add_subdirectory(lib/glm)
@@ -66,14 +66,26 @@ if(WIN32)
 else()
     set(GLM_LIB glm)
 endif()
-target_link_libraries(libpgmaker
-	PUBLIC
-	${FFMPEG_LIBS}
-    ${OPENAL_LIBRARY}
-	glad
-    ${GLM_LIB}
-	${Boost_LIBRARIES}
-)
+
+
+if(${OPENAL_FOUND})
+	target_link_libraries(libpgmaker
+		PUBLIC
+		${FFMPEG_LIBS}
+	    ${OPENAL_LIBRARY}
+		glad
+	    ${GLM_LIB}
+		${Boost_LIBRARIES}
+	)
+else()
+	target_link_libraries(libpgmaker
+		PUBLIC
+		${FFMPEG_LIBS}
+		glad
+	    ${GLM_LIB}
+		${Boost_LIBRARIES}
+	)
+endif()
 
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
