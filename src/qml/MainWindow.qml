@@ -69,10 +69,5 @@ Window {
         font.pixelSize: 12
     }
 
-    TaskBarButton {
-        id: dhsh
-        x: 286
-        y: 177
-    }
 
 }
