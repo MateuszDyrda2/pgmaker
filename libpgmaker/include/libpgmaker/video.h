@@ -33,12 +33,23 @@ struct thumbnail
     std::uint32_t width, height;
     std::unique_ptr<std::uint8_t[]> data;
 };
+struct video_info
+{
+    std::uint32_t width, height;
+    std::chrono::milliseconds duration;
+    std::uint64_t bitrate;
+    int pixelFormat;
+    int codecId;
+};
 class video
 {
   public:
     video() = default;
     video(const video_state& state);
     ~video();
+
+    void jump2(std::chrono::milliseconds timestamp);
+    void read1packet();
 
     void allocate_thumbnail(int width, int height);
     const video_data& get_data() const { return data; }
@@ -50,6 +61,14 @@ class video
   private:
     video_data data;
     video_state state;
+
+    AVFormatContext* avFormatContext;
+    AVCodecContext* avCodecContext;
+    SwsContext* swsContext;
+    std::uint8_t videoStreamIndex;
+    video_info information;
+
     friend class video_reader;
+    friend class channel;
 };
 } // namespace libpgmaker
