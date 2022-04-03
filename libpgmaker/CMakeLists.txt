@@ -23,11 +23,10 @@ if(NOT ${FFMPEG_FOUND})
 endif()
 
 
-
-find_package(glm REQUIRED)
 find_package(OpenAL REQUIRED)
 
 add_subdirectory(lib/glad)
+add_subdirectory(lib/glm)
 
 project(libpgmaker VERSION ${libpgmaker_VERSION} LANGUAGES CXX C)
 
