@@ -1,13 +1,13 @@
 import QtQuick 2.9
 import QtQuick.Controls 2.5
-import "qrc:/qml/TaskBarButton"
+
 
 Button {
     id: taskBarButton
 
-    property color defaultColor: "red"
-    property color hoverColor: "yellow"
-    property color clickedColor: "white"
+    property color defaultColor: "#555555"
+    property color hoverColor: "#5e5d5d"
+    property color clickedColor: "#696868"
 
     QtObject{
         id: internal

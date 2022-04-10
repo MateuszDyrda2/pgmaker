@@ -23,7 +23,13 @@ set(pgmaker_SRC
 )
 
 qt_add_executable(pgmaker ${pgmaker_SRC})
-qt_add_qml_module(pgmaker URI PGMaker VERSION ${pgmaker_VERSION} QML_FILES src/qml/MainWindow.qml src/qml/TaskBarButton.qml)
+qt_add_qml_module(pgmaker
+    URI PGMaker
+    VERSION ${pgmaker_VERSION}
+    QML_FILES
+        "src/qml/MainWindow.qml"
+        "src/qml/TaskBarButton.qml"
+)
 
 target_link_libraries(pgmaker PRIVATE libpgmaker Qt6::Quick)
 
