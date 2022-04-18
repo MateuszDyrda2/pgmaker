@@ -9,20 +9,9 @@ extern "C"
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace libpgmaker {
-struct video_state
-{
-    int width, height; ///< frame size
-
-    // internal state
-    AVFormatContext* avFormatContext{};
-    AVCodecContext* avCodecContext{};
-    int videoStreamIndex{ -1 };
-    int audioStreamIndex{ -1 };
-    SwsContext* swsScalerContext{};
-    AVRational timeBase;
-};
 struct thumbnail
 {
     std::uint32_t width, height;
@@ -40,21 +29,17 @@ class video
 {
   public:
     video() = default;
-    video(const video_state& state, const video_info& info);
-    ~video();
+    video(const std::string& path, const video_info& info, thumbnail&& tn):
+        path(path), information(info), tn(std::move(tn)) { }
 
-    void jump2(std::chrono::milliseconds timestamp);
-    void read1packet();
-
-    void allocate_thumbnail(int width, int height);
-    const video_state& get_state() const { return state; }
     const video_info& get_info() const { return information; }
-
-    thumbnail get_thumbnail(std::uint32_t width, std::uint32_t height);
+    const thumbnail& get_thumbnail() { return tn; }
+    const std::string& get_path() const { return path; }
 
   private:
-    video_state state;
+    std::string path;
     video_info information;
+    thumbnail tn;
 
     friend class video_reader;
     friend class channel;

@@ -48,7 +48,7 @@ set(libpgmaker_SRC
 	src/video.cpp
 	src/video_reader.cpp
 	src/textureGL.cpp
-	src/channel.cpp
+	src/clip.cpp
 	src/timeline.cpp
 	src/preview.cpp
 )

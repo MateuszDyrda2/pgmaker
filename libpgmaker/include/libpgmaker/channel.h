@@ -19,8 +19,11 @@ struct clip
     std::chrono::milliseconds startOffset;
     std::chrono::milliseconds endOffset;
     std::chrono::milliseconds startsAfter;
+
     clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& startsAfter):
-        vid(vid), startOffset{ 0 }, endOffset{ 0 }, startsAfter(startsAfter) { }
+        vid(vid),
+        startOffset{ 0 }, endOffset{ 0 }, startsAfter(startsAfter)
+    { }
 };
 class channel
 {

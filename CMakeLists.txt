@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(pgmaker_VERSION_MAJOR 0)
 set(pgmaker_VERSION_MINOR 1)
 set(pgmaker_VERSION_PATCH 0)

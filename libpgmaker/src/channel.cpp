@@ -51,7 +51,6 @@ frame* channel::get_frame(const std::chrono::milliseconds& delta)
         }
         previousFrame = currentFrame;
     }
-    std::cout << beg.count() << " and " << previousFrame->timestamp.count() << '\n';
     return previousFrame;
 }
 void channel::decoding_job()
