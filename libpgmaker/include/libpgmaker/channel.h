@@ -1,60 +1,57 @@
 #pragma once
 
+#include "clip.h"
 #include "pg_types.h"
-#include "video.h"
-
-#include <boost/lockfree/spsc_queue.hpp>
+#include "spsc_queue.h"
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <deque>
 #include <list>
+#include <mutex>
 #include <optional>
 #include <thread>
 
 namespace libpgmaker {
-struct clip
-{
-    std::shared_ptr<video> vid;
-    std::chrono::milliseconds startOffset;
-    std::chrono::milliseconds endOffset;
-    std::chrono::milliseconds startsAfter;
-
-    clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& startsAfter):
-        vid(vid),
-        startOffset{ 0 }, endOffset{ 0 }, startsAfter(startsAfter)
-    { }
-};
 class channel
 {
     template<class T, std::size_t S>
-    using spsc_queue  = boost::lockfree::spsc_queue<T, boost::lockfree::capacity<S>>;
+    using spsc_queue  = spsc_queue<T, S>;
     using worker_type = std::thread;
 
   public:
     channel(/* args */);
     ~channel();
 
-    frame* get_frame(const std::chrono::milliseconds& delta); // TODO: set playback speed and skip frame / return the same frame
+    frame* get_frame(const std::chrono::milliseconds& delta);
     bool add_clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& at);
+    void rebuild();
+    void jump2(const std::chrono::milliseconds& ts);
 
     std::chrono::milliseconds get_lenght() const { return lenght; }
 
   private:
     std::list<clip> clips;
     std::list<clip>::iterator currentClip;
-    spsc_queue<AVPacket*, 32> packetQueue;
+    spsc_queue<packet*, 32> packetQueue;
     spsc_queue<frame*, 32> frameQueue;
-    frame* previousFrame;
+    frame* prevFrame;
     frame* nextFrame;
     std::chrono::milliseconds timestamp;
+    std::chrono::milliseconds lenght;
     worker_type decodeWorker;
     worker_type videoWorker;
-    std::chrono::milliseconds lenght;
     std::atomic_bool finished;
+    std::atomic_bool stopped;
+    std::mutex videoMtx;
+    std::mutex decodingMtx;
+    std::condition_variable videoCvar;
+    std::condition_variable decodingCvar;
 
   private:
     void decoding_job();
     void video_job();
+    void recalculate_lenght();
 };
 } // namespace libpgmaker

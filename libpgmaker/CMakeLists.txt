@@ -45,10 +45,10 @@ set(FFMPEG_INCLUDE
 find_package(Boost COMPONENTS thread system REQUIRED)
 
 set(libpgmaker_SRC
-	src/video.cpp
 	src/video_reader.cpp
 	src/textureGL.cpp
 	src/clip.cpp
+	src/channel.cpp
 	src/timeline.cpp
 	src/preview.cpp
 )
@@ -90,7 +90,7 @@ endif()
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
 
-option(libpgmaker_BUILDSANDBOX "Build sandbox for library" OFF)
+option(libpgmaker_BUILDSANDBOX "Build sandbox for library" ON)
 
 if(libpgmaker_BUILDSANDBOX)
 	find_package(glfw3 REQUIRED)

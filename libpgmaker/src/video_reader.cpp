@@ -1,10 +1,11 @@
-#include <chrono>
 #include <libpgmaker/video_reader.h>
 
+#include <chrono>
 #include <memory>
 #include <stdexcept>
 
 #include <cstdint>
+#include <libpgmaker/pg_types.h>
 
 namespace libpgmaker {
 using namespace std;
@@ -147,6 +148,6 @@ std::shared_ptr<video> video_reader::load_file(const std::string& path)
     avformat_free_context(pFormatCtx);
     avcodec_free_context(&pCodecCtx);
 
-    return std::make_shared<video>(info, std::move(tn));
+    return std::make_shared<video>(path, info, std::move(tn));
 }
 } // namespace libpgmaker

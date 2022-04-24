@@ -1,3 +1,4 @@
+#include <stdexcept>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -14,6 +15,7 @@
 #include <libpgmaker/video_reader.h>
 
 static glm::ivec2 windowSize{ 1080, 720 };
+static bool isPaused = false;
 
 using namespace libpgmaker;
 int main()
@@ -134,7 +136,15 @@ int main()
     {
         textureGL tex(vid->get_info().width, vid->get_info().height);
         channel ch;
-        ch.add_clip(vid, std::chrono::milliseconds(0));
+        try
+        {
+            ch.add_clip(vid, std::chrono::milliseconds(0));
+        }
+        catch(const std::runtime_error& err)
+        {
+            std::cerr << err.what();
+            return -1;
+        }
         // ###############################################################
         using namespace std::chrono;
         high_resolution_clock::time_point tp;
@@ -159,12 +169,26 @@ int main()
             auto now   = high_resolution_clock::now();
             auto delta = duration_cast<milliseconds>(now - tp);
             tp         = now;
-            auto fr    = ch.get_frame(delta);
-            tex.update_data(fr->data.get());
-
-            tex.bind();
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-            tex.unbind();
+            frame* fr  = nullptr;
+            if(!isPaused)
+            {
+                try
+                {
+                    fr = ch.get_frame(delta);
+                }
+                catch(const std::runtime_error& err)
+                {
+                    std::cerr << err.what();
+                    return -1;
+                }
+            }
+            if(fr)
+            {
+                tex.update_data(fr->data.get());
+                tex.bind();
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                tex.unbind();
+            }
             glfwSwapBuffers(window);
             glfwPollEvents();
         }
