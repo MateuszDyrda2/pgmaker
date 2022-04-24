@@ -1,58 +1,75 @@
 #include <libpgmaker/channel.h>
 
+#include <algorithm>
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 namespace libpgmaker {
+using namespace std;
+
 channel::channel():
-    currentClip{ clips.end() }, finished{ false },
-    previousFrame{}, nextFrame{}, timestamp{ 0 }
+    currentClip{ clips.end() }, finished{ false }, prevFrame{},
+    nextFrame{}, timestamp{ 0 }, stopped{ true }
 {
-    decodeWorker = worker_type(&channel::decoding_job, this);
-    videoWorker  = worker_type(&channel::video_job, this);
 }
 channel::~channel()
 {
     finished.store(false);
-    decodeWorker.join();
-    videoWorker.join();
 }
 bool channel::add_clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& at)
 {
     clips.emplace_back(vid, at);
     currentClip = clips.begin();
+    recalculate_lenght();
     return true;
 }
 frame* channel::get_frame(const std::chrono::milliseconds& delta)
 {
-    timestamp += delta;
-    auto beg = timestamp - currentClip->startsAfter + currentClip->startOffset;
-
-    if(!previousFrame)
+    if(stopped)
     {
-        while(!frameQueue.pop(previousFrame))
-            ;
+        decodeWorker = worker_type(&channel::decoding_job, this);
+        decodeWorker.detach();
+        videoWorker = worker_type(&channel::video_job, this);
+        videoWorker.detach();
+        stopped = false;
     }
+    // dont do anything if the channel is empty
+    if(clips.empty()) return nullptr;
+    // increment time
+    timestamp += delta;
+    // end playing
+    if(timestamp >= lenght)
+    {
+        // stopped = true;
+        return nullptr;
+    }
+    // the channel just started
+    // we don't have a next frame
     if(!nextFrame)
     {
-        nextFrame = previousFrame;
+        frameQueue.pop(nextFrame);
     }
-
-    auto nextFrameTimestamp = nextFrame->timestamp;
-
-    if(beg >= nextFrameTimestamp)
+    // when should the frame be displayed?
+    auto pts = nextFrame->timestamp;
+    // the frame is ready to be displayed
+    if(timestamp >= pts)
     {
-        auto currentFrame = nextFrame;
-        while(beg > nextFrameTimestamp)
+        // try to find a newer frame to display
+        while(timestamp > pts)
         {
-            currentFrame = nextFrame;
-            if(!frameQueue.pop(nextFrame))
-                break;
-            nextFrameTimestamp = nextFrame->timestamp;
+            prevFrame = nextFrame;
+            if(!frameQueue.try_pop(nextFrame)) break;
+            pts = nextFrame->timestamp;
         }
-        previousFrame = currentFrame;
     }
-    std::cout << beg.count() << " and " << previousFrame->timestamp.count() << '\n';
-    return previousFrame;
+    return prevFrame;
+}
+void channel::rebuild()
+{
+}
+void channel::jump2(const std::chrono::milliseconds& ts)
+{
 }
 void channel::decoding_job()
 {
@@ -60,88 +77,66 @@ void channel::decoding_job()
     {
         if(currentClip != clips.end())
         {
-            auto vid              = currentClip->vid;
-            auto& vidState        = vid->get_state();
-            auto& avFormatContext = vidState.avFormatContext;
-            auto videoStreamIndex = vidState.videoStreamIndex;
-            auto audioStreamIndex = vidState.audioStreamIndex;
-            AVPacket* packet      = av_packet_alloc();
-            if(av_read_frame(avFormatContext, packet) >= 0)
+            auto& c      = *currentClip;
+            auto pPacket = av_packet_alloc();
+            if(c.get_packet(&pPacket))
             {
-                if(packet->stream_index == videoStreamIndex)
+                if(pPacket->stream_index == c.vsIndex)
                 {
-                    // check if full
-                    while(!packetQueue.push(packet) && !finished.load())
-                        ;
+                    auto p = new packet{ &c, pPacket };
+                    packetQueue.push(p);
                 }
-                else if(packet->stream_index == audioStreamIndex)
+                else if(pPacket->stream_index == c.asIndex)
                 {
-                    // audio stream
-                    av_packet_unref(packet);
+                    av_packet_unref(pPacket);
                 }
                 else
                 {
-                    av_packet_unref(packet);
+                    av_packet_unref(pPacket);
                 }
             }
+            else
+            {
+                // the clip has ended
+                advance(currentClip, 1);
+            }
+        }
+        else
+        {
+            // there are no more clips
+            return;
         }
     }
 }
 void channel::video_job()
 {
-    AVFrame* avFrame = av_frame_alloc();
+    AVFrame* pFrame = av_frame_alloc();
     while(!finished.load())
     {
-        if(currentClip != clips.end())
+        packet* p = nullptr;
+        packetQueue.pop(p);
+
+        auto c = p->owner;
+        if(finished) break;
+        if(c->get_frame(p->payload, &pFrame))
         {
-            auto vid              = currentClip->vid;
-            auto& vidState        = vid->get_state();
-            auto& avFormatContext = vidState.avFormatContext;
-            auto& avCodecContext  = vidState.avCodecContext;
-            auto& swsContext      = vidState.swsScalerContext;
-            auto& timeBase        = vidState.timeBase;
-            auto videoStreamIndex = vidState.videoStreamIndex;
-
-            AVPacket* packet = nullptr;
-            while(!packetQueue.pop(packet) && !finished.load())
-                ;
-            if(avcodec_send_packet(avCodecContext, packet) < 0)
-            {
-                // error decoding a packet
-            }
-            if(int response = avcodec_receive_frame(avCodecContext, avFrame);
-               response == AVERROR(EAGAIN) || response == AVERROR_EOF)
-            {
-                av_packet_unref(packet);
-                av_packet_free(&packet);
-                continue;
-            }
-            else if(response < 0)
-            {
-                // error decoding a packet
-            }
-            av_packet_unref(packet);
-            av_packet_free(&packet);
-            auto& info = vid->information;
-
-            auto buff             = new std::uint8_t[info.width
-                                         * info.height
-                                         * 4];
-            std::uint8_t* dest[4] = { buff, nullptr, nullptr, nullptr };
-            int destLineSize[4]   = { info.width * 4, 0, 0, 0 };
-            sws_scale(swsContext, avFrame->data, avFrame->linesize,
-                      0, avFrame->height,
-                      dest, destLineSize);
-            auto spts    = avFrame->pts * (double)timeBase.num / (double)timeBase.den;
-            auto sptsDur = std::chrono::duration<double>(spts);
-
-            auto fr = new frame{ { info.width, info.height },
-                                 std::unique_ptr<std::uint8_t[]>(buff),
-                                 std::chrono::duration_cast<std::chrono::milliseconds>(sptsDur) };
-            while(!frameQueue.push(fr) && !finished.load())
-                ;
+            auto fr = new frame;
+            c->scale_frame(pFrame, &fr);
+            frameQueue.push(fr);
         }
+        av_packet_unref(p->payload);
+        av_packet_free(&p->payload);
     }
-    av_frame_free(&avFrame);
+    av_frame_free(&pFrame);
+}
+void channel::recalculate_lenght()
+{
+    if(clips.empty())
+        lenght = chrono::milliseconds(0);
+    else
+    {
+        const auto& last = clips.back();
+        lenght           = last.startsAt + last.get_duration();
+    }
 }
 } // namespace libpgmaker
