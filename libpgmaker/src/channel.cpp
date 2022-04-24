@@ -19,7 +19,7 @@ channel::~channel()
 }
 bool channel::add_clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& at)
 {
-    clips.emplace_back(vid, at);
+    clips.emplace_back(make_unique<clip>(vid, at));
     currentClip = clips.begin();
     recalculate_lenght();
     return true;
@@ -65,8 +65,41 @@ frame* channel::get_frame(const std::chrono::milliseconds& delta)
     }
     return prevFrame;
 }
+clip* channel::get_clip(const std::chrono::milliseconds& at)
+{
+    if(at > lenght) return nullptr;
+
+    auto it = find_if(
+        clips.begin(), clips.end(),
+        [&](const auto& cl) {
+            return cl->contains(at);
+        });
+    return it == clips.end() ? nullptr : it->get();
+}
+bool channel::remove_clip(clip* cl)
+{
+    auto it = find_if(clips.begin(), clips.end(),
+                      [&](auto& c) { return c.get() == cl; });
+
+    if(it == clips.end()) return false;
+    clips.erase(it);
+    return true;
+}
+bool channel::remove_at(const std::chrono::milliseconds& at)
+{
+    auto it = find_if(clips.begin(), clips.end(),
+                      [&](auto& c) { return c->contains(at); });
+    if(it == clips.end()) return false;
+    clips.erase(it);
+    return true;
+}
 void channel::rebuild()
 {
+    std::for_each(
+        clips.begin(), clips.end(),
+        [](auto& cl) {
+            cl.reset();
+        });
 }
 void channel::jump2(const std::chrono::milliseconds& ts)
 {
@@ -79,14 +112,14 @@ void channel::decoding_job()
         {
             auto& c      = *currentClip;
             auto pPacket = av_packet_alloc();
-            if(c.get_packet(&pPacket))
+            if(c->get_packet(&pPacket))
             {
-                if(pPacket->stream_index == c.vsIndex)
+                if(pPacket->stream_index == c->vsIndex)
                 {
-                    auto p = new packet{ &c, pPacket };
-                    packetQueue.push(p);
+                    auto p = new packet{ c.get(), pPacket };
+                    packetQueue.push(p, [this] { return finished.load(); });
                 }
-                else if(pPacket->stream_index == c.asIndex)
+                else if(pPacket->stream_index == c->asIndex)
                 {
                     av_packet_unref(pPacket);
                 }
@@ -114,7 +147,7 @@ void channel::video_job()
     while(!finished.load())
     {
         packet* p = nullptr;
-        packetQueue.pop(p);
+        packetQueue.pop(p, [this] { return finished.load(); });
 
         auto c = p->owner;
         if(finished) break;
@@ -122,7 +155,7 @@ void channel::video_job()
         {
             auto fr = new frame;
             c->scale_frame(pFrame, &fr);
-            frameQueue.push(fr);
+            frameQueue.push(fr, [this] { return finished.load(); });
         }
         av_packet_unref(p->payload);
         av_packet_free(&p->payload);
@@ -136,7 +169,12 @@ void channel::recalculate_lenght()
     else
     {
         const auto& last = clips.back();
-        lenght           = last.startsAt + last.get_duration();
+        lenght           = last->startsAt + last->get_duration();
     }
+}
+void channel::flush_queues()
+{
+    packetQueue.flush();
+    frameQueue.flush();
 }
 } // namespace libpgmaker

@@ -157,4 +157,8 @@ void clip::scale_frame(AVFrame* iFrame, frame** oFrame)
 
     (*oFrame)->timestamp = realTs;
 }
+bool clip::contains(const std::chrono::milliseconds& ts) const
+{
+    return ts >= startsAt && ts < get_ends_at();
+}
 }

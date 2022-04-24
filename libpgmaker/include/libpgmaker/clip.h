@@ -18,6 +18,8 @@ class clip
     const std::chrono::milliseconds& get_starts_at() const { return startsAt; }
     const std::chrono::milliseconds& get_start_offset() const { return startOffset; }
     const std::chrono::milliseconds& get_end_offset() const { return endOffset; }
+    std::chrono::milliseconds get_ends_at() const { return startsAt + get_duration(); }
+
     AVRational get_timebase() const { return timebase; }
     std::uint32_t get_width() const { return width; }
     std::uint32_t get_height() const { return height; }
@@ -30,6 +32,7 @@ class clip
     bool get_packet(AVPacket** pPacket);
     bool get_frame(AVPacket* pPacket, AVFrame** frame);
     void scale_frame(AVFrame* iFrame, frame** oFrame);
+    bool contains(const std::chrono::milliseconds& ts) const;
 
   private:
     std::shared_ptr<video> vid;

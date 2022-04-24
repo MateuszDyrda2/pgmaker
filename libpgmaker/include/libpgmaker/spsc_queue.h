@@ -24,9 +24,15 @@ class spsc_queue
     bool try_pop(T& obj);
     bool try_pop(T& obj, const std::chrono::milliseconds& timeout);
     void pop(T& obj);
+    template<class F>
+    void pop(T& obj, F pred);
     void push(const T& obj);
+    template<class F>
+    void push(const T& obj, F pred);
     size_type size() const;
     bool empty() const;
+    void flush();
+    void notify();
 
   private:
     std::queue<T> buffer;
@@ -83,6 +89,31 @@ void spsc_queue<T, N>::push(const T& obj)
     emptyCvar.notify_one();
 }
 template<class T, std::size_t N>
+template<class F>
+void spsc_queue<T, N>::pop(T& obj, F pred)
+{
+    std::unique_lock lck(mtx);
+    while(buffer.empty() || !pred())
+    {
+        emptyCvar.wait(lck);
+    }
+    obj = std::move(buffer.front());
+    buffer.pop();
+    fullCvar.notify_one();
+}
+template<class T, std::size_t N>
+template<class F>
+void spsc_queue<T, N>::push(const T& obj, F pred)
+{
+    std::unique_lock lck(mtx);
+    while(buffer.size() >= N - 1 || !pred())
+    {
+        fullCvar.wait(lck);
+    }
+    buffer.push(obj);
+    emptyCvar.notify_one();
+}
+template<class T, std::size_t N>
 typename spsc_queue<T, N>::size_type
 spsc_queue<T, N>::size() const
 {
@@ -96,4 +127,16 @@ bool spsc_queue<T, N>::empty() const
     return buffer.empty();
 }
 
+template<class T, std::size_t N>
+void spsc_queue<T, N>::flush()
+{
+    std::lock_guard lck(mtx);
+    std::queue<T>().swap(buffer);
+}
+template<class T, std::size_t N>
+void spsc_queue<T, N>::notify()
+{
+    fullCvar.notify_one();
+    emptyCvar.notify_one();
+}
 } // namespace libpgmaker

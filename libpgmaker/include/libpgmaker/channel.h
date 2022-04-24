@@ -26,14 +26,17 @@ class channel
 
     frame* get_frame(const std::chrono::milliseconds& delta);
     bool add_clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& at);
+    clip* get_clip(const std::chrono::milliseconds& at);
+    bool remove_clip(clip* cl);
+    bool remove_at(const std::chrono::milliseconds& at);
     void rebuild();
     void jump2(const std::chrono::milliseconds& ts);
 
     std::chrono::milliseconds get_lenght() const { return lenght; }
 
   private:
-    std::list<clip> clips;
-    std::list<clip>::iterator currentClip;
+    std::list<std::unique_ptr<clip>> clips;
+    std::list<std::unique_ptr<clip>>::iterator currentClip;
     spsc_queue<packet*, 32> packetQueue;
     spsc_queue<frame*, 32> frameQueue;
     frame* prevFrame;
@@ -53,5 +56,7 @@ class channel
     void decoding_job();
     void video_job();
     void recalculate_lenght();
+
+    void flush_queues();
 };
 } // namespace libpgmaker
