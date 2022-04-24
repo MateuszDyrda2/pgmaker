@@ -9,31 +9,28 @@ namespace libpgmaker {
 using namespace std;
 
 channel::channel():
-    currentClip{ clips.end() }, finished{ false }, prevFrame{},
+    currentClip{ clips.end() }, prevFrame{},
     nextFrame{}, timestamp{ 0 }, stopped{ true }
 {
 }
 channel::~channel()
 {
-    finished.store(false);
+    stopped = true;
+    packetQueue.notify();
+    frameQueue.notify();
+    if(decodeWorker.joinable()) decodeWorker.join();
+    if(videoWorker.joinable()) videoWorker.join();
 }
 bool channel::add_clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& at)
 {
-    clips.emplace_back(vid, at);
+    clips.emplace_back(make_unique<clip>(vid, at));
     currentClip = clips.begin();
-    recalculate_lenght();
+    rebuild();
     return true;
 }
 frame* channel::get_frame(const std::chrono::milliseconds& delta)
 {
-    if(stopped)
-    {
-        decodeWorker = worker_type(&channel::decoding_job, this);
-        decodeWorker.detach();
-        videoWorker = worker_type(&channel::video_job, this);
-        videoWorker.detach();
-        stopped = false;
-    }
+
     // dont do anything if the channel is empty
     if(clips.empty()) return nullptr;
     // increment time
@@ -67,26 +64,43 @@ frame* channel::get_frame(const std::chrono::milliseconds& delta)
 }
 void channel::rebuild()
 {
+    stopped = true;
+    packetQueue.notify();
+    frameQueue.notify();
+
+    if(decodeWorker.joinable())
+        decodeWorker.join();
+    if(videoWorker.joinable())
+        videoWorker.join();
+
+    recalculate_lenght();
+
+    frameQueue.flush();
+    packetQueue.flush();
+
+    stopped      = false;
+    decodeWorker = worker_type(&channel::decoding_job, this);
+    videoWorker  = worker_type(&channel::video_job, this);
 }
 void channel::jump2(const std::chrono::milliseconds& ts)
 {
 }
 void channel::decoding_job()
 {
-    while(!finished.load())
+    while(!stopped)
     {
         if(currentClip != clips.end())
         {
             auto& c      = *currentClip;
             auto pPacket = av_packet_alloc();
-            if(c.get_packet(&pPacket))
+            if(c->get_packet(&pPacket))
             {
-                if(pPacket->stream_index == c.vsIndex)
+                if(pPacket->stream_index == c->vsIndex)
                 {
-                    auto p = new packet{ &c, pPacket };
-                    packetQueue.push(p);
+                    auto p = new packet{ c.get(), pPacket };
+                    packetQueue.push(p, [this] { return stopped == true; });
                 }
-                else if(pPacket->stream_index == c.asIndex)
+                else if(pPacket->stream_index == c->asIndex)
                 {
                     av_packet_unref(pPacket);
                 }
@@ -111,18 +125,18 @@ void channel::decoding_job()
 void channel::video_job()
 {
     AVFrame* pFrame = av_frame_alloc();
-    while(!finished.load())
+    while(!stopped)
     {
         packet* p = nullptr;
-        packetQueue.pop(p);
+        packetQueue.pop(p, [this] { return stopped == true; });
+        if(!p) break;
 
         auto c = p->owner;
-        if(finished) break;
         if(c->get_frame(p->payload, &pFrame))
         {
             auto fr = new frame;
             c->scale_frame(pFrame, &fr);
-            frameQueue.push(fr);
+            frameQueue.push(fr, [this] { return stopped == true; });
         }
         av_packet_unref(p->payload);
         av_packet_free(&p->payload);
@@ -136,7 +150,7 @@ void channel::recalculate_lenght()
     else
     {
         const auto& last = clips.back();
-        lenght           = last.startsAt + last.get_duration();
+        lenght           = last->startsAt + last->get_duration();
     }
 }
 } // namespace libpgmaker
