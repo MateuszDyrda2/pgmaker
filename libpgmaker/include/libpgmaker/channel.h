@@ -32,8 +32,8 @@ class channel
     std::chrono::milliseconds get_lenght() const { return lenght; }
 
   private:
-    std::list<clip> clips;
-    std::list<clip>::iterator currentClip;
+    std::list<std::unique_ptr<clip>> clips;
+    std::list<std::unique_ptr<clip>>::iterator currentClip;
     spsc_queue<packet*, 32> packetQueue;
     spsc_queue<frame*, 32> frameQueue;
     frame* prevFrame;
@@ -42,12 +42,7 @@ class channel
     std::chrono::milliseconds lenght;
     worker_type decodeWorker;
     worker_type videoWorker;
-    std::atomic_bool finished;
     std::atomic_bool stopped;
-    std::mutex videoMtx;
-    std::mutex decodingMtx;
-    std::condition_variable videoCvar;
-    std::condition_variable decodingCvar;
 
   private:
     void decoding_job();
