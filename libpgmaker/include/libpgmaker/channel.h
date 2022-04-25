@@ -4,6 +4,8 @@
 #include "pg_types.h"
 #include "spsc_queue.h"
 
+#include <portaudio.h>
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -44,9 +46,20 @@ class channel
     worker_type videoWorker;
     std::atomic_bool stopped;
 
+    PaStream* audioStream;
+
   private:
+    void init_audio();
+    void drop_audio();
     void decoding_job();
     void video_job();
     void recalculate_lenght();
+    static int pa_stream_callback(
+        const void* input,
+        void* output,
+        unsigned long frameCount,
+        const PaStreamCallbackTimeInfo* timeInfo,
+        PaStreamCallbackFlags statusFlags,
+        void* userData);
 };
 } // namespace libpgmaker

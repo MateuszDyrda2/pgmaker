@@ -12,9 +12,11 @@ channel::channel():
     currentClip{ clips.end() }, prevFrame{},
     nextFrame{}, timestamp{ 0 }, stopped{ true }
 {
+    init_audio();
 }
 channel::~channel()
 {
+    drop_audio();
     stopped = true;
     packetQueue.notify();
     frameQueue.notify();
@@ -152,5 +154,78 @@ void channel::recalculate_lenght()
         const auto& last = clips.back();
         lenght           = last->startsAt + last->get_duration();
     }
+}
+void channel::init_audio()
+{
+    auto err = Pa_Initialize();
+    if(err != paNoError)
+    {
+        throw runtime_error("PortAudio failed while initializing with: " + string(Pa_GetErrorText(err)));
+    }
+    static constexpr size_t SAMPLE_RATE = 44100;
+
+    err = Pa_OpenDefaultStream(
+        &audioStream,
+        0,
+        1,
+        paFloat32,
+        SAMPLE_RATE,
+        256,
+        pa_stream_callback,
+        this);
+    if(err != paNoError)
+    {
+        throw runtime_error("PortAudio failed while opening a stream with: " + string(Pa_GetErrorText(err)));
+    }
+    err = Pa_StartStream(audioStream);
+    if(err != paNoError)
+    {
+        throw runtime_error("PortAudio failed while starting a stream with: " + string(Pa_GetErrorText(err)));
+    }
+}
+void channel::drop_audio()
+{
+    auto err = Pa_StopStream(audioStream);
+    if(err != paNoError)
+    {
+        throw runtime_error("PortAudio failed while stopping a stream with: " + string(Pa_GetErrorText(err)));
+    }
+    err = Pa_CloseStream(audioStream);
+    if(err != paNoError)
+    {
+        throw runtime_error("PortAudio failed while closing a stream with: " + string(Pa_GetErrorText(err)));
+    }
+    err = Pa_Terminate();
+    if(err != paNoError)
+    {
+        throw runtime_error("PortAudio failed while destroying with: " + string(Pa_GetErrorText(err)));
+    }
+}
+int channel::pa_stream_callback(
+    const void* input,
+    void* output,
+    unsigned long frameCount,
+    const PaStreamCallbackTimeInfo* timeInfo,
+    PaStreamCallbackFlags statusFlags,
+    void* userData)
+{
+    auto& ch = *(channel*)userData;
+
+    auto out = (float*)output;
+
+    static float val = 0.0f;
+    static bool up   = true;
+    for(int i = 0; i < frameCount; ++i)
+    {
+        *++out = val;
+        if(up)
+            val += 0.0001;
+        else
+            val -= 0.0001;
+
+        if(val >= 1.f) up = false;
+        if(val <= -1.f) up = true;
+    }
+    return 0;
 }
 } // namespace libpgmaker
