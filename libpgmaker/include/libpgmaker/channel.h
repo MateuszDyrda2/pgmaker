@@ -36,7 +36,8 @@ class channel
   private:
     std::list<std::unique_ptr<clip>> clips;
     std::list<std::unique_ptr<clip>>::iterator currentClip;
-    spsc_queue<packet*, 32> packetQueue;
+    spsc_queue<packet*, 32> videoPacketQueue;
+    spsc_queue<packet*, 32> audioPacketQueue;
     spsc_queue<frame*, 32> frameQueue;
     frame* prevFrame;
     frame* nextFrame;
@@ -44,6 +45,7 @@ class channel
     std::chrono::milliseconds lenght;
     worker_type decodeWorker;
     worker_type videoWorker;
+    worker_type audioWorker;
     std::atomic_bool stopped;
 
     PaStream* audioStream;
@@ -53,6 +55,7 @@ class channel
     void drop_audio();
     void decoding_job();
     void video_job();
+    void audio_decode_frame();
     void recalculate_lenght();
     static int pa_stream_callback(
         const void* input,

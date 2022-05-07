@@ -4,6 +4,7 @@ extern "C"
 {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
 
@@ -21,6 +22,11 @@ struct frame
     resolution size;
     std::unique_ptr<std::uint8_t[]> data;
     std::chrono::milliseconds timestamp;
+};
+struct audio_frame
+{
+    std::unique_ptr<std::uint8_t[]> data;
+    std::size_t nbData;
 };
 struct packet
 {

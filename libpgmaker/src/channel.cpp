@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <iostream>
 #include <thread>
 
@@ -18,7 +19,7 @@ channel::~channel()
 {
     drop_audio();
     stopped = true;
-    packetQueue.notify();
+    videoPacketQueue.notify();
     frameQueue.notify();
     if(decodeWorker.joinable()) decodeWorker.join();
     if(videoWorker.joinable()) videoWorker.join();
@@ -67,7 +68,7 @@ frame* channel::get_frame(const std::chrono::milliseconds& delta)
 void channel::rebuild()
 {
     stopped = true;
-    packetQueue.notify();
+    videoPacketQueue.notify();
     frameQueue.notify();
 
     if(decodeWorker.joinable())
@@ -78,7 +79,7 @@ void channel::rebuild()
     recalculate_lenght();
 
     frameQueue.flush();
-    packetQueue.flush();
+    videoPacketQueue.flush();
 
     stopped      = false;
     decodeWorker = worker_type(&channel::decoding_job, this);
@@ -100,11 +101,13 @@ void channel::decoding_job()
                 if(pPacket->stream_index == c->vsIndex)
                 {
                     auto p = new packet{ c.get(), pPacket };
-                    packetQueue.push(p, [this] { return stopped == true; });
+                    videoPacketQueue.push(p, [this] { return stopped == true; });
                 }
                 else if(pPacket->stream_index == c->asIndex)
                 {
-                    av_packet_unref(pPacket);
+                    auto p = new packet{ c.get(), pPacket };
+                    audioPacketQueue.push(p, [this] { return stopped == true; });
+                    // av_packet_unref(pPacket);
                 }
                 else
                 {
@@ -130,20 +133,32 @@ void channel::video_job()
     while(!stopped)
     {
         packet* p = nullptr;
-        packetQueue.pop(p, [this] { return stopped == true; });
+        videoPacketQueue.pop(p, [this] { return stopped == true; });
         if(!p) break;
 
         auto c = p->owner;
         if(c->get_frame(p->payload, &pFrame))
         {
             auto fr = new frame;
-            c->scale_frame(pFrame, &fr);
+            c->convert_frame(pFrame, &fr);
             frameQueue.push(fr, [this] { return stopped == true; });
         }
         av_packet_unref(p->payload);
         av_packet_free(&p->payload);
     }
     av_frame_free(&pFrame);
+}
+void channel::audio_decode_frame()
+{
+    packet* p       = nullptr;
+    AVFrame* pFrame = av_frame_alloc();
+
+    audioPacketQueue.pop(p);
+    auto c = p->owner;
+    if(c->get_frame(p->payload, &pFrame))
+    {
+        auto fr = new audio_frame;
+    }
 }
 void channel::recalculate_lenght()
 {
@@ -162,15 +177,15 @@ void channel::init_audio()
     {
         throw runtime_error("PortAudio failed while initializing with: " + string(Pa_GetErrorText(err)));
     }
-    static constexpr size_t SAMPLE_RATE = 44100;
+    static constexpr size_t SAMPLE_RATE = 48000;
 
     err = Pa_OpenDefaultStream(
         &audioStream,
         0,
-        1,
+        2,
         paFloat32,
         SAMPLE_RATE,
-        256,
+        1024,
         pa_stream_callback,
         this);
     if(err != paNoError)
@@ -202,7 +217,7 @@ void channel::drop_audio()
     }
 }
 int channel::pa_stream_callback(
-    const void* input,
+    const void* /*input*/,
     void* output,
     unsigned long frameCount,
     const PaStreamCallbackTimeInfo* timeInfo,
@@ -210,9 +225,24 @@ int channel::pa_stream_callback(
     void* userData)
 {
     auto& ch = *(channel*)userData;
-
     auto out = (float*)output;
 
+    packet* p = nullptr;
+    static std::vector<float> buff;
+    int sampleCount = frameCount;
+    while(sampleCount > 0)
+    {
+        ch.audioPacketQueue.pop(p);
+        auto* c      = p->owner;
+        int nbFrames = c->get_audio_frame(p->payload, buff);
+        sampleCount -= (unsigned long)(0.5f * buff.size());
+        std::memcpy(out, buff.data(), buff.size() * sizeof(float));
+        out += buff.size();
+        buff.clear();
+    }
+    return 0;
+
+    /*
     static float val = 0.0f;
     static bool up   = true;
     for(int i = 0; i < frameCount; ++i)
@@ -227,5 +257,6 @@ int channel::pa_stream_callback(
         if(val <= -1.f) up = true;
     }
     return 0;
+    */
 }
 } // namespace libpgmaker

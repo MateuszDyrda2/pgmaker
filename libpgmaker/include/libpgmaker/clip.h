@@ -29,7 +29,9 @@ class clip
     void reset();
     bool get_packet(AVPacket** pPacket);
     bool get_frame(AVPacket* pPacket, AVFrame** frame);
-    void scale_frame(AVFrame* iFrame, frame** oFrame);
+    int get_audio_frame(AVPacket* pPacket, std::vector<float>& buff);
+    void convert_frame(AVFrame* iFrame, frame** oFrame);
+    void convert_audio_frame(AVFrame* iFrame, audio_frame** oFrame);
 
   private:
     std::shared_ptr<video> vid;
@@ -39,14 +41,19 @@ class clip
 
     std::uint32_t width, height;
     AVFormatContext* pFormatCtx;
-    AVCodecContext* pCodecCtx;
+    AVCodecContext* pVideoCodecCtx;
+    AVCodecContext* pAudioCodecCtx;
     int vsIndex, asIndex;
     SwsContext* swsCtx;
+    SwrContext* swrCtx;
     AVRational timebase;
+    std::uint32_t sampleRate;
+    std::uint32_t nbChannels;
 
   private:
     friend class channel;
     void open_input(const std::string& path);
+    bool open_codec(AVCodecParameters* codecParams, AVCodecContext** ctx);
     void fill_buffer();
     void seek_start();
 };

@@ -10,19 +10,21 @@ using namespace std;
 clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt):
     vid(vid), startOffset{}, endOffset{}, startsAt(startsAt),
     width{}, height{},
-    pFormatCtx{}, pCodecCtx{}, vsIndex{ -1 }, asIndex{ -1 },
+    pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
+    vsIndex{ -1 }, asIndex{ -1 },
     swsCtx{}, timebase{}
 {
     assert(vid);
     open_input(vid->get_path());
-    //    fill_buffer();
 }
 clip::~clip()
 {
+    swr_free(&swrCtx);
     sws_freeContext(swsCtx);
+    avcodec_free_context(&pVideoCodecCtx);
+    avcodec_free_context(&pAudioCodecCtx);
     avformat_close_input(&pFormatCtx);
     avformat_free_context(pFormatCtx);
-    avcodec_free_context(&pCodecCtx);
 }
 void clip::open_input(const std::string& path)
 {
@@ -38,53 +40,70 @@ void clip::open_input(const std::string& path)
     {
         throw runtime_error("Could not find stream information for " + path);
     }
-    AVCodecParameters* codecParams = nullptr;
     for(int i = 0; i < pFormatCtx->nb_streams; ++i)
     {
-        auto streams = pFormatCtx->streams[i];
+        const auto streams = pFormatCtx->streams[i];
         if(streams->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
-            vsIndex     = i;
-            codecParams = streams->codecpar;
-            width       = codecParams->width;
-            height      = codecParams->height;
+            vsIndex = i;
+            width   = streams->codecpar->width;
+            height  = streams->codecpar->height;
         }
         else if(streams->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
-            asIndex = i;
+            asIndex    = i;
+            sampleRate = streams->codecpar->sample_rate;
+            nbChannels = streams->codecpar->channels;
         }
     }
     if(vsIndex == -1 || asIndex == -1)
     {
         throw runtime_error("The file does not contain video or audio streams: " + path);
     }
-    const AVCodec* pCodec = avcodec_find_decoder(codecParams->codec_id);
-    if(!pCodec)
+    if(!open_codec(pFormatCtx->streams[vsIndex]->codecpar, &pVideoCodecCtx))
     {
         throw runtime_error("Could not allocate codec for video");
     }
-    pCodecCtx = avcodec_alloc_context3(pCodec);
-    if(!pCodecCtx)
+    if(!open_codec(pFormatCtx->streams[asIndex]->codecpar, &pAudioCodecCtx))
     {
-        throw runtime_error("Could not allocate codec context");
+        throw runtime_error("Could not allocate codec for audio");
     }
-    if(avcodec_parameters_to_context(pCodecCtx, codecParams) < 0)
-    {
-        throw runtime_error("Could not set codec context parameters");
-    }
-    if(avcodec_open2(pCodecCtx, pCodec, NULL) < 0)
-    {
-        throw runtime_error("Could not open codec for file " + path);
-    }
-    swsCtx = sws_getContext(width, height, pCodecCtx->pix_fmt,
+
+    // convert to rgba
+    swsCtx = sws_getContext(width, height, pVideoCodecCtx->pix_fmt,
                             width, height, AV_PIX_FMT_RGB0,
                             SWS_BILINEAR, NULL, NULL, NULL);
     if(!swsCtx)
     {
         throw runtime_error("Could not allocate SWScaler context");
     }
+    swrCtx = swr_alloc_set_opts(
+        NULL,
+        pAudioCodecCtx->channel_layout,
+        AV_SAMPLE_FMT_FLT,
+        pAudioCodecCtx->sample_rate,
+        pAudioCodecCtx->channel_layout,
+        pAudioCodecCtx->sample_fmt,
+        pAudioCodecCtx->sample_rate,
+        0, 0);
+    swr_init(swrCtx);
+    if(!swr_is_initialized(swrCtx))
+    {
+        throw runtime_error("Could not allocate SWResample context");
+    }
 
     timebase = pFormatCtx->streams[vsIndex]->time_base;
+}
+bool clip::open_codec(AVCodecParameters* codecParams, AVCodecContext** ctx)
+{
+    if(const auto codec = avcodec_find_decoder(codecParams->codec_id))
+    {
+        *ctx = avcodec_alloc_context3(codec);
+        if(avcodec_parameters_to_context(*ctx, codecParams) < 0) return false;
+        if(avcodec_open2(*ctx, codec, NULL) < 0) return false;
+        return true;
+    }
+    return false;
 }
 void clip::move_to(const std::chrono::milliseconds& startsAt)
 {
@@ -125,11 +144,11 @@ bool clip::get_packet(AVPacket** pPacket)
 }
 bool clip::get_frame(AVPacket* pPacket, AVFrame** frame)
 {
-    if(avcodec_send_packet(pCodecCtx, pPacket) < 0)
+    if(avcodec_send_packet(pVideoCodecCtx, pPacket) < 0)
     {
         throw runtime_error("Failed to decode a packet");
     }
-    if(int response = avcodec_receive_frame(pCodecCtx, *frame);
+    if(int response = avcodec_receive_frame(pVideoCodecCtx, *frame);
        response == AVERROR(EAGAIN) || response == AVERROR_EOF)
     {
         return false;
@@ -140,7 +159,7 @@ bool clip::get_frame(AVPacket* pPacket, AVFrame** frame)
     }
     return true;
 }
-void clip::scale_frame(AVFrame* iFrame, frame** oFrame)
+void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
 {
     auto buff             = new std::uint8_t[width * height * 4];
     std::uint8_t* dest[4] = { buff, nullptr, nullptr, nullptr };
@@ -156,5 +175,47 @@ void clip::scale_frame(AVFrame* iFrame, frame** oFrame)
     const auto realTs = startsAt - startOffset + ts;
 
     (*oFrame)->timestamp = realTs;
+}
+int clip::get_audio_frame(AVPacket* pPacket, std::vector<float>& buff)
+{
+    if(avcodec_send_packet(pAudioCodecCtx, pPacket) < 0)
+    {
+        throw runtime_error("Failed to decode a packet");
+    }
+
+    int nbFrames = 0;
+    // may contain multiple frames
+    for(;;)
+    {
+        AVFrame* frame = av_frame_alloc();
+        if(int response = avcodec_receive_frame(pAudioCodecCtx, frame);
+           response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+        {
+            av_frame_free(&frame);
+            break;
+        }
+        else if(response < 0)
+        {
+            throw runtime_error("Failed to decode a packet");
+        }
+        float* buffer = new float[nbChannels * frame->nb_samples];
+        /*av_samples_alloc((std::uint8_t**)&buffer, NULL, nbChannels,
+                         frame->nb_samples, AVSampleFormat::AV_SAMPLE_FMT_FLT, 1);
+                         */
+        auto cSamples = swr_convert(swrCtx, (std::uint8_t**)&buffer,
+                                    frame->nb_samples,
+                                    const_cast<const std::uint8_t**>(frame->extended_data),
+                                    frame->nb_samples);
+        buff.insert(buff.end(), buffer, buffer + (cSamples * nbChannels));
+        // av_freep(&buffer);
+        delete[] buffer;
+        ++nbFrames;
+        av_frame_free(&frame);
+    }
+    return nbFrames;
+}
+void clip::convert_audio_frame(AVFrame* iFrame, audio_frame** oFrame)
+{
+    auto buff = new std::uint8_t[nbChannels * sampleRate];
 }
 }
