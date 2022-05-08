@@ -12,32 +12,36 @@ namespace libpgmaker {
 class clip
 {
   public:
-    clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt);
+    using milliseconds = std::chrono::milliseconds;
+
+  public:
+    clip(const std::shared_ptr<video>& vid, milliseconds startsAt);
     ~clip();
 
-    const std::chrono::milliseconds& get_starts_at() const { return startsAt; }
-    const std::chrono::milliseconds& get_start_offset() const { return startOffset; }
-    const std::chrono::milliseconds& get_end_offset() const { return endOffset; }
+    const milliseconds& get_starts_at() const { return startsAt; }
+    const milliseconds& get_start_offset() const { return startOffset; }
+    const milliseconds& get_end_offset() const { return endOffset; }
     AVRational get_timebase() const { return timebase; }
     std::uint32_t get_width() const { return width; }
     std::uint32_t get_height() const { return height; }
-    std::chrono::milliseconds get_duration() const { return vid->get_info().duration - startOffset - endOffset; }
-    bool contains(const std::chrono::milliseconds& ts) const;
+    milliseconds get_duration() const { return vid->get_info().duration - startOffset - endOffset; }
+    bool contains(const milliseconds& ts) const;
 
-    void move_to(const std::chrono::milliseconds& startsAt);
-    void change_start_offset(const std::chrono::milliseconds& startOffset);
-    void change_end_offset(const std::chrono::milliseconds& endOffset);
+    void move_to(const milliseconds& startsAt);
+    bool seek(const milliseconds& ts);
+    void change_start_offset(const milliseconds& startOffset);
+    void change_end_offset(const milliseconds& endOffset);
     void reset();
     bool get_packet(AVPacket** pPacket);
     bool get_frame(AVPacket* pPacket, AVFrame** frame);
-    std::chrono::milliseconds get_audio_frame(AVPacket* pPacket, std::vector<float>& buff);
+    milliseconds get_audio_frame(AVPacket* pPacket, std::vector<float>& buff);
     void convert_frame(AVFrame* iFrame, frame** oFrame);
 
   private:
     std::shared_ptr<video> vid;
-    std::chrono::milliseconds startOffset;
-    std::chrono::milliseconds endOffset;
-    std::chrono::milliseconds startsAt;
+    milliseconds startOffset;
+    milliseconds endOffset;
+    milliseconds startsAt;
 
     std::uint32_t width, height;
     AVFormatContext* pFormatCtx;

@@ -22,6 +22,7 @@ channel::~channel()
     drop_audio();
     stopped = true;
     videoPacketQueue.notify();
+    audioPacketQueue.notify();
     frameQueue.notify();
     if(decodeWorker.joinable()) decodeWorker.join();
     if(videoWorker.joinable()) videoWorker.join();
@@ -30,7 +31,9 @@ bool channel::add_clip(const shared_ptr<video>& vid, const chrono::milliseconds&
 {
     clips.emplace_back(make_unique<clip>(vid, at));
     currentClip = clips.begin();
-    rebuild();
+    stop();
+    recalculate_lenght();
+    start();
     return true;
 }
 frame* channel::get_frame(const duration& timestamp)
@@ -65,31 +68,34 @@ bool channel::set_paused(bool value)
 {
     auto old = paused.load();
     paused   = value;
-    return paused;
+    return old;
 }
-void channel::rebuild()
+void channel::stop()
 {
     stopped = true;
     videoPacketQueue.notify();
+    audioPacketQueue.notify();
     frameQueue.notify();
 
-    if(decodeWorker.joinable())
-        decodeWorker.join();
-    if(videoWorker.joinable())
-        videoWorker.join();
-
-    recalculate_lenght();
+    if(decodeWorker.joinable()) decodeWorker.join();
+    if(videoWorker.joinable()) videoWorker.join();
 
     frameQueue.flush();
     videoPacketQueue.flush();
+    audioPacketQueue.flush();
 
+    nextFrame = prevFrame = nullptr;
+}
+void channel::start()
+{
     stopped      = false;
     decodeWorker = worker_type(&channel::decoding_job, this);
     videoWorker  = worker_type(&channel::video_job, this);
 }
 void channel::jump2(const chrono::milliseconds& ts)
 {
-    // TODO: implement seeking
+    stop();
+
     auto it = find_if(
         clips.begin(), clips.end(),
         [&, this](auto& c) {
@@ -97,7 +103,13 @@ void channel::jump2(const chrono::milliseconds& ts)
         });
     if(it == clips.end()) return;
 
-    auto diff = ts - (*it)->startsAt;
+    auto cl = it->get();
+    if(!cl->seek(ts))
+    {
+        throw runtime_error("Failed to jump to requested timestamp");
+    }
+
+    start();
 }
 void channel::decoding_job()
 {
@@ -211,16 +223,14 @@ int channel::pa_stream_callback(
     void* userData)
 {
     static std::vector<float> buff;
-    auto& ch = *(channel*)userData;
-    auto out = (float*)output;
+    auto& ch = *(static_cast<channel*>(userData));
+    auto out = static_cast<float*>(output);
 
     packet* p       = nullptr;
     int sampleCount = frameCount * nbChannels;
     if(ch.paused)
     {
-        // std::memcpy(out, ch.silentBuffer.data(), sampleCount * 2 * sizeof(float));
-        // std::copy(ch.silentBuffer.begin(), ch.silentBuffer.end(), out);
-        std::copy_n(ch.silentBuffer.begin(), sampleCount, out);
+        copy_n(ch.silentBuffer.begin(), sampleCount, out);
     }
     else
     {
@@ -231,15 +241,13 @@ int channel::pa_stream_callback(
                 auto* c  = p->owner;
                 auto pts = c->get_audio_frame(p->payload, buff);
                 sampleCount -= buff.size();
-                std::copy(buff.begin(), buff.end(), out);
-                std::advance(out, buff.size());
+                copy(buff.begin(), buff.end(), out);
+                advance(out, buff.size());
                 buff.clear();
             }
             else
             {
-                // std::memcpy(out, ch.silentBuffer.data(), sampleCount * 2 * sizeof(float));
-                // std::copy(ch.silentBuffer.begin(), ch.silentBuffer.end(), out);
-                std::copy_n(ch.silentBuffer.begin(), sampleCount, out);
+                copy_n(ch.silentBuffer.begin(), sampleCount, out);
                 sampleCount = 0;
             }
         }

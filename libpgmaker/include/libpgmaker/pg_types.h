@@ -11,6 +11,7 @@ extern "C"
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace libpgmaker {
 struct resolution
@@ -25,8 +26,8 @@ struct frame
 };
 struct audio_frame
 {
-    std::unique_ptr<std::uint8_t[]> data;
-    std::size_t nbData;
+    std::vector<float> data;
+    std::chrono::milliseconds pts;
 };
 struct packet
 {

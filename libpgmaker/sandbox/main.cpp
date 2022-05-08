@@ -17,6 +17,7 @@
 static glm::ivec2 windowSize{ 1080, 720 };
 static bool isPaused     = true;
 static bool changePaused = false;
+static bool jumpBack     = false;
 
 using namespace libpgmaker;
 int main()
@@ -47,10 +48,27 @@ int main()
         windowSize = { width, height };
     });
     glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int, int action, int) {
-        if(key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        switch(key)
         {
-            isPaused ^= 1;
-            changePaused = true;
+        case GLFW_KEY_SPACE:
+        {
+            if(action == GLFW_PRESS)
+            {
+                isPaused ^= 1;
+                changePaused = true;
+            }
+        }
+        break;
+        case GLFW_KEY_H:
+        {
+            if(action == GLFW_PRESS)
+            {
+                jumpBack = true;
+            }
+        }
+        break;
+        default:
+            break;
         }
     });
 
@@ -175,6 +193,11 @@ int main()
             {
                 changePaused = false;
                 tl.set_paused(isPaused);
+            }
+            if(jumpBack)
+            {
+                jumpBack = false;
+                tl.jump2(std::chrono::milliseconds(2000));
             }
             if(high_resolution_clock::now() - lastFrame > microseconds(1661))
             {
