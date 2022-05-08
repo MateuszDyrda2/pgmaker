@@ -10,8 +10,8 @@
 
 #include <iostream>
 
-#include <libpgmaker/channel.h>
 #include <libpgmaker/textureGL.h>
+#include <libpgmaker/timeline.h>
 #include <libpgmaker/video_reader.h>
 
 static glm::ivec2 windowSize{ 1080, 720 };
@@ -143,10 +143,11 @@ int main()
 
     {
         textureGL tex(vid->get_info().width, vid->get_info().height);
-        channel ch;
+        timeline tl({ .size = { 1920, 1080 }, .framerate = 30 });
+        auto ch = tl.add_channel();
         try
         {
-            ch.add_clip(vid, std::chrono::milliseconds(0));
+            ch->add_clip(vid, std::chrono::milliseconds(0));
         }
         catch(const std::runtime_error& err)
         {
@@ -173,14 +174,14 @@ int main()
             if(changePaused)
             {
                 changePaused = false;
-                ch.set_paused(isPaused);
+                tl.set_paused(isPaused);
             }
             if(high_resolution_clock::now() - lastFrame > microseconds(1661))
             {
                 lastFrame = high_resolution_clock::now();
                 try
                 {
-                    fr = ch.get_frame();
+                    fr = tl.get_frame();
                 }
                 catch(const std::runtime_error& err)
                 {

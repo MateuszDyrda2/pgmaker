@@ -217,4 +217,8 @@ chrono::milliseconds clip::get_audio_frame(AVPacket* pPacket, std::vector<float>
     }
     return realTs;
 }
+bool clip::contains(const std::chrono::milliseconds& ts) const
+{
+    return ts >= startsAt && ts < startsAt + get_duration();
+}
 }

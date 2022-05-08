@@ -22,6 +22,7 @@ class clip
     std::uint32_t get_width() const { return width; }
     std::uint32_t get_height() const { return height; }
     std::chrono::milliseconds get_duration() const { return vid->get_info().duration - startOffset - endOffset; }
+    bool contains(const std::chrono::milliseconds& ts) const;
 
     void move_to(const std::chrono::milliseconds& startsAt);
     void change_start_offset(const std::chrono::milliseconds& startOffset);

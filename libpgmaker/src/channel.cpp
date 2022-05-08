@@ -11,11 +11,9 @@ using namespace std;
 
 channel::channel():
     currentClip{ clips.end() }, prevFrame{},
-    nextFrame{}, stopped{ true }
+    nextFrame{}, stopped{ true }, paused{ true }
 {
-    silentBuffer.resize(2048, 0.f);
-    start        = chrono::high_resolution_clock::now();
-    pausedOffset = chrono::high_resolution_clock::duration(0);
+    silentBuffer.resize(nbChannels * nbFrames, 0.f);
     set_paused(true);
     init_audio();
 }
@@ -28,23 +26,20 @@ channel::~channel()
     if(decodeWorker.joinable()) decodeWorker.join();
     if(videoWorker.joinable()) videoWorker.join();
 }
-bool channel::add_clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& at)
+bool channel::add_clip(const shared_ptr<video>& vid, const chrono::milliseconds& at)
 {
     clips.emplace_back(make_unique<clip>(vid, at));
     currentClip = clips.begin();
     rebuild();
     return true;
 }
-frame* channel::get_frame()
+frame* channel::get_frame(const duration& timestamp)
 {
-    auto now = chrono::duration_cast<chrono::milliseconds>(
-        chrono::high_resolution_clock::now() - start - pausedOffset);
-
     if(paused)
     {
         return nextFrame;
     }
-    if(now >= lenght)
+    if(timestamp >= lenght)
     {
         return nullptr;
     }
@@ -55,9 +50,9 @@ frame* channel::get_frame()
     }
 
     auto pts = nextFrame->timestamp;
-    if(now >= pts)
+    if(timestamp >= pts)
     {
-        while(now > pts)
+        while(timestamp > pts)
         {
             prevFrame = nextFrame;
             if(!frameQueue.try_pop(nextFrame)) break;
@@ -68,15 +63,9 @@ frame* channel::get_frame()
 }
 bool channel::set_paused(bool value)
 {
-    paused = value;
-    if(value == true)
-    {
-        pauseStarted = chrono::high_resolution_clock::now();
-    }
-    else
-    {
-        pausedOffset += chrono::high_resolution_clock::now() - pauseStarted;
-    }
+    auto old = paused.load();
+    paused   = value;
+    return paused;
 }
 void channel::rebuild()
 {
@@ -98,8 +87,17 @@ void channel::rebuild()
     decodeWorker = worker_type(&channel::decoding_job, this);
     videoWorker  = worker_type(&channel::video_job, this);
 }
-void channel::jump2(const std::chrono::milliseconds& ts)
+void channel::jump2(const chrono::milliseconds& ts)
 {
+    // TODO: implement seeking
+    auto it = find_if(
+        clips.begin(), clips.end(),
+        [&, this](auto& c) {
+            return c->contains(ts);
+        });
+    if(it == clips.end()) return;
+
+    auto diff = ts - (*it)->startsAt;
 }
 void channel::decoding_job()
 {
@@ -120,7 +118,6 @@ void channel::decoding_job()
                 {
                     auto p = new packet{ c.get(), pPacket };
                     audioPacketQueue.push(p, [this] { return stopped == true; });
-                    // av_packet_unref(pPacket);
                 }
                 else
                 {
@@ -161,18 +158,6 @@ void channel::video_job()
     }
     av_frame_free(&pFrame);
 }
-void channel::audio_decode_frame()
-{
-    packet* p       = nullptr;
-    AVFrame* pFrame = av_frame_alloc();
-
-    audioPacketQueue.pop(p);
-    auto c = p->owner;
-    if(c->get_frame(p->payload, &pFrame))
-    {
-        auto fr = new audio_frame;
-    }
-}
 void channel::recalculate_lenght()
 {
     if(clips.empty())
@@ -185,20 +170,13 @@ void channel::recalculate_lenght()
 }
 void channel::init_audio()
 {
-    auto err = Pa_Initialize();
-    if(err != paNoError)
-    {
-        throw runtime_error("PortAudio failed while initializing with: " + string(Pa_GetErrorText(err)));
-    }
-    static constexpr size_t SAMPLE_RATE = 48000;
-
-    err = Pa_OpenDefaultStream(
+    auto err = Pa_OpenDefaultStream(
         &audioStream,
         0,
-        2,
+        nbChannels,
         paFloat32,
-        SAMPLE_RATE,
-        1024,
+        sampleRate,
+        nbFrames,
         pa_stream_callback,
         this);
     if(err != paNoError)
@@ -223,11 +201,6 @@ void channel::drop_audio()
     {
         throw runtime_error("PortAudio failed while closing a stream with: " + string(Pa_GetErrorText(err)));
     }
-    err = Pa_Terminate();
-    if(err != paNoError)
-    {
-        throw runtime_error("PortAudio failed while destroying with: " + string(Pa_GetErrorText(err)));
-    }
 }
 int channel::pa_stream_callback(
     const void* /*input*/,
@@ -242,14 +215,12 @@ int channel::pa_stream_callback(
     auto out = (float*)output;
 
     packet* p       = nullptr;
-    int sampleCount = frameCount;
-    auto now        = chrono::duration_cast<chrono::milliseconds>(
-        chrono::high_resolution_clock::now() - ch.start - ch.pausedOffset);
+    int sampleCount = frameCount * nbChannels;
     if(ch.paused)
     {
         // std::memcpy(out, ch.silentBuffer.data(), sampleCount * 2 * sizeof(float));
         // std::copy(ch.silentBuffer.begin(), ch.silentBuffer.end(), out);
-        std::copy_n(ch.silentBuffer.begin(), sampleCount * 2, out);
+        std::copy_n(ch.silentBuffer.begin(), sampleCount, out);
     }
     else
     {
@@ -259,7 +230,7 @@ int channel::pa_stream_callback(
             {
                 auto* c  = p->owner;
                 auto pts = c->get_audio_frame(p->payload, buff);
-                sampleCount -= (unsigned long)(0.5f * buff.size());
+                sampleCount -= buff.size();
                 std::copy(buff.begin(), buff.end(), out);
                 std::advance(out, buff.size());
                 buff.clear();
@@ -267,7 +238,8 @@ int channel::pa_stream_callback(
             else
             {
                 // std::memcpy(out, ch.silentBuffer.data(), sampleCount * 2 * sizeof(float));
-                std::copy(ch.silentBuffer.begin(), ch.silentBuffer.end(), out);
+                // std::copy(ch.silentBuffer.begin(), ch.silentBuffer.end(), out);
+                std::copy_n(ch.silentBuffer.begin(), sampleCount, out);
                 sampleCount = 0;
             }
         }
