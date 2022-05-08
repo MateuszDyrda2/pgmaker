@@ -176,14 +176,14 @@ void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
 
     (*oFrame)->timestamp = realTs;
 }
-int clip::get_audio_frame(AVPacket* pPacket, std::vector<float>& buff)
+chrono::milliseconds clip::get_audio_frame(AVPacket* pPacket, std::vector<float>& buff)
 {
     if(avcodec_send_packet(pAudioCodecCtx, pPacket) < 0)
     {
         throw runtime_error("Failed to decode a packet");
     }
 
-    int nbFrames = 0;
+    chrono::milliseconds realTs(0);
     // may contain multiple frames
     for(;;)
     {
@@ -208,14 +208,13 @@ int clip::get_audio_frame(AVPacket* pPacket, std::vector<float>& buff)
                                     frame->nb_samples);
         buff.insert(buff.end(), buffer, buffer + (cSamples * nbChannels));
         // av_freep(&buffer);
+        const auto pts = frame->pts * timebase.num / double(timebase.den);
+        const auto ts  = chrono::duration_cast<chrono::milliseconds>(chrono::duration<double>(pts));
+        realTs         = startsAt - startOffset + ts;
+
         delete[] buffer;
-        ++nbFrames;
         av_frame_free(&frame);
     }
-    return nbFrames;
-}
-void clip::convert_audio_frame(AVFrame* iFrame, audio_frame** oFrame)
-{
-    auto buff = new std::uint8_t[nbChannels * sampleRate];
+    return realTs;
 }
 }

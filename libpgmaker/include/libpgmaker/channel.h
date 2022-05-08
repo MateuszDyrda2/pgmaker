@@ -26,12 +26,13 @@ class channel
     channel(/* args */);
     ~channel();
 
-    frame* get_frame(const std::chrono::milliseconds& delta);
+    frame* get_frame();
     bool add_clip(const std::shared_ptr<video>& vid, const std::chrono::milliseconds& at);
     void rebuild();
     void jump2(const std::chrono::milliseconds& ts);
 
     std::chrono::milliseconds get_lenght() const { return lenght; }
+    bool set_paused(bool value);
 
   private:
     std::list<std::unique_ptr<clip>> clips;
@@ -41,12 +42,16 @@ class channel
     spsc_queue<frame*, 32> frameQueue;
     frame* prevFrame;
     frame* nextFrame;
-    std::chrono::milliseconds timestamp;
     std::chrono::milliseconds lenght;
+    std::chrono::high_resolution_clock::time_point start;
+    std::chrono::high_resolution_clock::time_point pauseStarted;
+    std::chrono::high_resolution_clock::duration pausedOffset;
     worker_type decodeWorker;
     worker_type videoWorker;
-    worker_type audioWorker;
     std::atomic_bool stopped;
+    std::atomic_bool paused;
+    std::vector<float> silentBuffer;
+    std::pair<std::chrono::milliseconds, std::vector<float>> nextAudioFrame;
 
     PaStream* audioStream;
 

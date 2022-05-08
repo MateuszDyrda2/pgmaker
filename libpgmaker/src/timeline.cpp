@@ -24,11 +24,11 @@ channel* timeline::get_channel(std::size_t index)
     assert(index < channels.size());
     return channels[index].get();
 }
-std::shared_ptr<frame> timeline::tick_frame(const std::chrono::milliseconds& delta)
+std::shared_ptr<frame> timeline::get_frame()
 {
     for(auto&& ch : channels)
     {
-        auto f = ch->get_frame(delta);
+        auto f = ch->get_frame();
     }
 }
 } // namespace libpgmaker

@@ -9,6 +9,10 @@ namespace libpgmaker {
 class timeline
 {
   public:
+    using time_point = std::chrono::high_resolution_clock::time_point;
+    using duration   = std::chrono::high_resolution_clock::duration;
+
+  public:
     /** @brief Create a timeline specifying the settings.
      * The settings can be changed at any moment
      * @param settings project settings
@@ -31,9 +35,13 @@ class timeline
      * @param delta time in milliseconds since last time this function was called
      * @return pointer to the requested frame
      */
-    std::shared_ptr<frame> tick_frame(const std::chrono::milliseconds& delta);
+    std::shared_ptr<frame> get_frame();
+    bool set_paused(bool value);
 
   private:
+    time_point start;
+    time_point pauseStarted;
+    duration pausedOffset;
     project_settings settings;
     std::deque<std::unique_ptr<channel>> channels;
     std::chrono::milliseconds timestamp;

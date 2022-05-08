@@ -15,7 +15,8 @@
 #include <libpgmaker/video_reader.h>
 
 static glm::ivec2 windowSize{ 1080, 720 };
-static bool isPaused = false;
+static bool isPaused     = true;
+static bool changePaused = false;
 
 using namespace libpgmaker;
 int main()
@@ -44,6 +45,13 @@ int main()
 
     glfwSetWindowSizeCallback(window, [](GLFWwindow* window, int width, int height) {
         windowSize = { width, height };
+    });
+    glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int, int action, int) {
+        if(key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        {
+            isPaused ^= 1;
+            changePaused = true;
+        }
     });
 
     if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -147,7 +155,7 @@ int main()
         }
         // ###############################################################
         using namespace std::chrono;
-        high_resolution_clock::time_point tp;
+        auto lastFrame = high_resolution_clock::now();
         while(!glfwWindowShouldClose(window))
         {
             static bool isFirst = true;
@@ -161,20 +169,18 @@ int main()
                                             glm::vec3(float(vid->get_info().width), float(vid->get_info().height), 1.f));
             glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
 
-            if(isFirst)
+            frame* fr = nullptr;
+            if(changePaused)
             {
-                isFirst = false;
-                tp      = high_resolution_clock::now();
+                changePaused = false;
+                ch.set_paused(isPaused);
             }
-            auto now   = high_resolution_clock::now();
-            auto delta = duration_cast<milliseconds>(now - tp);
-            tp         = now;
-            frame* fr  = nullptr;
-            if(!isPaused)
+            if(high_resolution_clock::now() - lastFrame > microseconds(1661))
             {
+                lastFrame = high_resolution_clock::now();
                 try
                 {
-                    fr = ch.get_frame(delta);
+                    fr = ch.get_frame();
                 }
                 catch(const std::runtime_error& err)
                 {
@@ -185,10 +191,10 @@ int main()
             if(fr)
             {
                 tex.update_data(fr->data.get());
-                tex.bind();
-                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-                tex.unbind();
             }
+            tex.bind();
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            tex.unbind();
             glfwSwapBuffers(window);
             glfwPollEvents();
         }

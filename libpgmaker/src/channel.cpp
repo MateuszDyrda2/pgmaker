@@ -11,8 +11,12 @@ using namespace std;
 
 channel::channel():
     currentClip{ clips.end() }, prevFrame{},
-    nextFrame{}, timestamp{ 0 }, stopped{ true }
+    nextFrame{}, stopped{ true }
 {
+    silentBuffer.resize(2048, 0.f);
+    start        = chrono::high_resolution_clock::now();
+    pausedOffset = chrono::high_resolution_clock::duration(0);
+    set_paused(true);
     init_audio();
 }
 channel::~channel()
@@ -31,32 +35,29 @@ bool channel::add_clip(const std::shared_ptr<video>& vid, const std::chrono::mil
     rebuild();
     return true;
 }
-frame* channel::get_frame(const std::chrono::milliseconds& delta)
+frame* channel::get_frame()
 {
+    auto now = chrono::duration_cast<chrono::milliseconds>(
+        chrono::high_resolution_clock::now() - start - pausedOffset);
 
-    // dont do anything if the channel is empty
-    if(clips.empty()) return nullptr;
-    // increment time
-    timestamp += delta;
-    // end playing
-    if(timestamp >= lenght)
+    if(paused)
     {
-        // stopped = true;
+        return nextFrame;
+    }
+    if(now >= lenght)
+    {
         return nullptr;
     }
-    // the channel just started
-    // we don't have a next frame
     if(!nextFrame)
     {
-        frameQueue.pop(nextFrame);
+        if(!frameQueue.try_pop(nextFrame))
+            return nullptr;
     }
-    // when should the frame be displayed?
+
     auto pts = nextFrame->timestamp;
-    // the frame is ready to be displayed
-    if(timestamp >= pts)
+    if(now >= pts)
     {
-        // try to find a newer frame to display
-        while(timestamp > pts)
+        while(now > pts)
         {
             prevFrame = nextFrame;
             if(!frameQueue.try_pop(nextFrame)) break;
@@ -64,6 +65,18 @@ frame* channel::get_frame(const std::chrono::milliseconds& delta)
         }
     }
     return prevFrame;
+}
+bool channel::set_paused(bool value)
+{
+    paused = value;
+    if(value == true)
+    {
+        pauseStarted = chrono::high_resolution_clock::now();
+    }
+    else
+    {
+        pausedOffset += chrono::high_resolution_clock::now() - pauseStarted;
+    }
 }
 void channel::rebuild()
 {
@@ -224,39 +237,41 @@ int channel::pa_stream_callback(
     PaStreamCallbackFlags statusFlags,
     void* userData)
 {
+    static std::vector<float> buff;
     auto& ch = *(channel*)userData;
     auto out = (float*)output;
 
-    packet* p = nullptr;
-    static std::vector<float> buff;
+    packet* p       = nullptr;
     int sampleCount = frameCount;
-    while(sampleCount > 0)
+    auto now        = chrono::duration_cast<chrono::milliseconds>(
+        chrono::high_resolution_clock::now() - ch.start - ch.pausedOffset);
+    if(ch.paused)
     {
-        ch.audioPacketQueue.pop(p);
-        auto* c      = p->owner;
-        int nbFrames = c->get_audio_frame(p->payload, buff);
-        sampleCount -= (unsigned long)(0.5f * buff.size());
-        std::memcpy(out, buff.data(), buff.size() * sizeof(float));
-        out += buff.size();
-        buff.clear();
+        // std::memcpy(out, ch.silentBuffer.data(), sampleCount * 2 * sizeof(float));
+        // std::copy(ch.silentBuffer.begin(), ch.silentBuffer.end(), out);
+        std::copy_n(ch.silentBuffer.begin(), sampleCount * 2, out);
+    }
+    else
+    {
+        while(sampleCount > 0)
+        {
+            if(ch.audioPacketQueue.try_pop(p))
+            {
+                auto* c  = p->owner;
+                auto pts = c->get_audio_frame(p->payload, buff);
+                sampleCount -= (unsigned long)(0.5f * buff.size());
+                std::copy(buff.begin(), buff.end(), out);
+                std::advance(out, buff.size());
+                buff.clear();
+            }
+            else
+            {
+                // std::memcpy(out, ch.silentBuffer.data(), sampleCount * 2 * sizeof(float));
+                std::copy(ch.silentBuffer.begin(), ch.silentBuffer.end(), out);
+                sampleCount = 0;
+            }
+        }
     }
     return 0;
-
-    /*
-    static float val = 0.0f;
-    static bool up   = true;
-    for(int i = 0; i < frameCount; ++i)
-    {
-        *++out = val;
-        if(up)
-            val += 0.0001;
-        else
-            val -= 0.0001;
-
-        if(val >= 1.f) up = false;
-        if(val <= -1.f) up = true;
-    }
-    return 0;
-    */
 }
 } // namespace libpgmaker
