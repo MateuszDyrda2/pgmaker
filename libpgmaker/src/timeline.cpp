@@ -5,12 +5,12 @@
 namespace libpgmaker {
 using namespace std;
 timeline::timeline(const project_settings& settings):
-    paused(false), start(), pausedOffset(),
-    startOffset(duration(0)), settings(settings)
+    paused(false), start(), pausedOffset(0),
+    startOffset(0), settings(settings), pauseStarted()
 {
+    rebuild();
     set_paused(true);
     initialize_audio();
-    rebuild();
 }
 timeline::~timeline()
 {
@@ -18,7 +18,7 @@ timeline::~timeline()
 }
 channel* timeline::add_channel()
 {
-    return channels.emplace_back(make_unique<channel>()).get();
+    return channels.emplace_back(make_unique<channel>(*this)).get();
 }
 void timeline::remove_channel(std::size_t index)
 {
@@ -32,9 +32,7 @@ channel* timeline::get_channel(std::size_t index)
 }
 frame* timeline::get_frame()
 {
-    using namespace chrono;
-    auto timestamp = duration_cast<milliseconds>(
-        high_resolution_clock::now() - start - pausedOffset + startOffset);
+    const auto timestamp = get_timestamp();
 
     vector<frame*> frames;
     for(auto& ch : channels)
@@ -89,13 +87,22 @@ void timeline::rebuild()
 }
 void timeline::jump2(const milliseconds& ts)
 {
-    auto old    = set_paused(true);
-    startOffset = ts;
-    rebuild();
+    using namespace chrono;
+    // auto old    = set_paused(true);
+    startOffset  = ts;
+    pausedOffset = duration(0);
+    // rebuild();
+    start = pauseStarted = high_resolution_clock::now();
     for(auto& ch : channels)
     {
         ch->jump2(ts);
     }
-    set_paused(old);
+}
+timeline::milliseconds timeline::get_timestamp() const
+{
+    using namespace chrono;
+
+    return duration_cast<milliseconds>(
+        high_resolution_clock::now() - start - pausedOffset + startOffset);
 }
 } // namespace libpgmaker

@@ -21,7 +21,8 @@ class clip
     const milliseconds& get_starts_at() const { return startsAt; }
     const milliseconds& get_start_offset() const { return startOffset; }
     const milliseconds& get_end_offset() const { return endOffset; }
-    AVRational get_timebase() const { return timebase; }
+    AVRational get_vtimebase() const { return vidTimebase; }
+    AVRational get_atimebase() const { return audioTimebase; }
     std::uint32_t get_width() const { return width; }
     std::uint32_t get_height() const { return height; }
     milliseconds get_duration() const { return vid->get_info().duration - startOffset - endOffset; }
@@ -34,7 +35,7 @@ class clip
     void reset();
     bool get_packet(AVPacket** pPacket);
     bool get_frame(AVPacket* pPacket, AVFrame** frame);
-    milliseconds get_audio_frame(AVPacket* pPacket, std::vector<float>& buff);
+    std::pair<std::size_t, milliseconds> get_audio_frame(packet* pPacket, float*& b);
     void convert_frame(AVFrame* iFrame, frame** oFrame);
 
   private:
@@ -50,7 +51,8 @@ class clip
     int vsIndex, asIndex;
     SwsContext* swsCtx;
     SwrContext* swrCtx;
-    AVRational timebase;
+    AVRational vidTimebase;
+    AVRational audioTimebase;
     std::uint32_t sampleRate;
     std::uint32_t nbChannels;
 

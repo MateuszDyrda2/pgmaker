@@ -12,7 +12,7 @@ clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt
     width{}, height{},
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
-    swsCtx{}, timebase{}
+    swsCtx{}, vidTimebase{}, audioTimebase{}
 {
     assert(vid);
     open_input(vid->get_path());
@@ -92,7 +92,8 @@ void clip::open_input(const string& path)
         throw runtime_error("Could not allocate SWResample context");
     }
 
-    timebase = pFormatCtx->streams[vsIndex]->time_base;
+    vidTimebase   = pFormatCtx->streams[vsIndex]->time_base;
+    audioTimebase = pFormatCtx->streams[asIndex]->time_base;
 }
 bool clip::open_codec(AVCodecParameters* codecParams, AVCodecContext** ctx)
 {
@@ -120,7 +121,7 @@ void clip::change_end_offset(const milliseconds& endOffset)
 }
 void clip::seek_start()
 {
-    const auto pts = startOffset.count() * timebase.den / (double)timebase.num;
+    const auto pts = startOffset.count() * vidTimebase.den / (double)vidTimebase.num;
 
     if(avformat_seek_file(pFormatCtx, vsIndex, INT64_MIN, pts, INT64_MAX, 0) < 0)
     {
@@ -136,7 +137,7 @@ bool clip::get_packet(AVPacket** pPacket)
     if(av_read_frame(pFormatCtx, *pPacket) < 0)
         return false;
 
-    const auto time      = (*pPacket)->pts * timebase.num / (double)timebase.den;
+    const auto time      = (*pPacket)->pts * vidTimebase.num / (double)vidTimebase.den;
     const auto millitime = chrono::duration<double>(time);
     const auto endtime   = vid->get_info().duration - endOffset;
 
@@ -170,19 +171,19 @@ void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
 
     (*oFrame)->size   = { width, height };
     (*oFrame)->data   = unique_ptr<std::uint8_t[]>(buff);
-    const auto pts    = iFrame->pts * timebase.num / double(timebase.den);
+    const auto pts    = iFrame->pts * vidTimebase.num / double(vidTimebase.den);
     const auto ts     = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));
     const auto realTs = startsAt - startOffset + ts;
 
     (*oFrame)->timestamp = realTs;
 }
-chrono::milliseconds clip::get_audio_frame(AVPacket* pPacket, std::vector<float>& buff)
+pair<std::size_t, chrono::milliseconds> clip::get_audio_frame(packet* pPacket, float*& b)
 {
-    if(avcodec_send_packet(pAudioCodecCtx, pPacket) < 0)
+    if(avcodec_send_packet(pAudioCodecCtx, pPacket->payload) < 0)
     {
         throw runtime_error("Failed to decode a packet");
     }
-
+    std::size_t bSize = 0;
     chrono::milliseconds realTs(0);
     // may contain multiple frames
     for(;;)
@@ -198,24 +199,24 @@ chrono::milliseconds clip::get_audio_frame(AVPacket* pPacket, std::vector<float>
         {
             throw runtime_error("Failed to decode a packet");
         }
-        float* buffer = new float[nbChannels * frame->nb_samples];
-        /*av_samples_alloc((std::uint8_t**)&buffer, NULL, nbChannels,
-                         frame->nb_samples, AVSampleFormat::AV_SAMPLE_FMT_FLT, 1);
-                         */
-        auto cSamples = swr_convert(swrCtx, (std::uint8_t**)&buffer,
-                                    frame->nb_samples,
-                                    const_cast<const std::uint8_t**>(frame->extended_data),
-                                    frame->nb_samples);
-        buff.insert(buff.end(), buffer, buffer + (cSamples * nbChannels));
-        // av_freep(&buffer);
-        const auto pts = frame->pts * timebase.num / double(timebase.den);
-        const auto ts  = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));
-        realTs         = startsAt - startOffset + ts;
+        float* buffer[] = { b };
 
-        delete[] buffer;
+        auto cSamples       = swr_convert(swrCtx, (std::uint8_t**)buffer,
+                                          frame->nb_samples,
+                                          const_cast<const std::uint8_t**>(frame->extended_data),
+                                          frame->nb_samples);
+        const auto nbBuffer = cSamples * nbChannels;
+        std::advance(b, nbBuffer);
+        bSize += cSamples;
+        const auto pts = frame->pts * audioTimebase.num / double(audioTimebase.den);
+        const auto ts  = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));
+        if(realTs == chrono::milliseconds(0))
+            realTs = startsAt - startOffset + ts;
+
         av_frame_free(&frame);
     }
-    return realTs;
+
+    return { bSize, realTs };
 }
 bool clip::contains(const std::chrono::milliseconds& ts) const
 {
@@ -226,7 +227,7 @@ bool clip::seek(const milliseconds& ts)
     assert(ts >= startsAt);
     assert(ts <= startsAt + get_duration());
     auto regTs   = ts - startsAt + startOffset;
-    uint64_t pts = regTs.count() * timebase.den / (double)timebase.num;
-    return (avformat_seek_file(pFormatCtx, -1, INT64_MIN, pts, INT64_MAX, 0) >= 0);
+    uint64_t pts = regTs.count() * vidTimebase.den / (double)vidTimebase.num;
+    return (avformat_seek_file(pFormatCtx, vsIndex, INT64_MIN, pts, INT64_MAX, 0) >= 0);
 }
 }

@@ -1,5 +1,7 @@
 #include <libpgmaker/channel.h>
 
+#include <libpgmaker/timeline.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -9,9 +11,10 @@
 namespace libpgmaker {
 using namespace std;
 
-channel::channel():
+channel::channel(const timeline& tl):
     currentClip{ clips.end() }, prevFrame{},
-    nextFrame{}, stopped{ true }, paused{ true }
+    nextFrame{}, stopped{ true }, paused{ true },
+    tl(tl)
 {
     silentBuffer.resize(nbChannels * nbFrames, 0.f);
     set_paused(true);
@@ -26,6 +29,7 @@ channel::~channel()
     frameQueue.notify();
     if(decodeWorker.joinable()) decodeWorker.join();
     if(videoWorker.joinable()) videoWorker.join();
+    // if(audioWorker.joinable()) audioWorker.join();
 }
 bool channel::add_clip(const shared_ptr<video>& vid, const chrono::milliseconds& at)
 {
@@ -79,6 +83,7 @@ void channel::stop()
 
     if(decodeWorker.joinable()) decodeWorker.join();
     if(videoWorker.joinable()) videoWorker.join();
+    // if(audioWorker.joinable()) audioWorker.join();
 
     frameQueue.flush();
     videoPacketQueue.flush();
@@ -91,6 +96,7 @@ void channel::start()
     stopped      = false;
     decodeWorker = worker_type(&channel::decoding_job, this);
     videoWorker  = worker_type(&channel::video_job, this);
+    // audioWorker  = worker_type(&channel::audio_job, this);
 }
 void channel::jump2(const chrono::milliseconds& ts)
 {
@@ -182,15 +188,62 @@ void channel::recalculate_lenght()
 }
 void channel::init_audio()
 {
-    auto err = Pa_OpenDefaultStream(
+    /*
+ PaStreamParameters outParams;
+ outParams.channelCount              = nbChannels;
+ outParams.device                    = Pa_GetDefaultOutputDevice();
+ outParams.suggestedLatency          = Pa_GetDeviceInfo(outParams.device)->defaultLowOutputLatency;
+ outParams.hostApiSpecificStreamInfo = NULL;
+ outParams.sampleFormat              = paFloat32;
+
+ auto err = Pa_OpenStream(
+     &audioStream,
+     NULL,
+     &outParams,
+     sampleRate,
+     nbFrames,
+     paClipOff,
+     NULL,
+     NULL);
+ if(err != paNoError)
+ {
+     throw runtime_error("PortAudio failed while opening a stream with: " + string(Pa_GetErrorText(err)));
+ }
+ err = Pa_StartStream(audioStream);
+ if(err != paNoError)
+ {
+     throw runtime_error("PortAudio failed while starting a stream with: " + string(Pa_GetErrorText(err)));
+ }
+ */
+    /*
+        auto err = Pa_OpenDefaultStream(
+            &audioStream,
+            0,
+            nbChannels,
+            paFloat32,
+            sampleRate,
+            nbFrames,
+            pa_stream_callback,
+            this);
+            */
+
+    PaStreamParameters outParams;
+    outParams.channelCount              = nbChannels;
+    outParams.device                    = Pa_GetDefaultOutputDevice();
+    outParams.suggestedLatency          = 0;
+    outParams.hostApiSpecificStreamInfo = NULL;
+    outParams.sampleFormat              = paFloat32;
+
+    auto err = Pa_OpenStream(
         &audioStream,
-        0,
-        nbChannels,
-        paFloat32,
+        NULL,
+        &outParams,
         sampleRate,
         nbFrames,
+        paClipOff,
         pa_stream_callback,
         this);
+
     if(err != paNoError)
     {
         throw runtime_error("PortAudio failed while opening a stream with: " + string(Pa_GetErrorText(err)));
@@ -200,6 +253,7 @@ void channel::init_audio()
     {
         throw runtime_error("PortAudio failed while starting a stream with: " + string(Pa_GetErrorText(err)));
     }
+    audioBuffer.resize(nbChannels * nbFrames);
 }
 void channel::drop_audio()
 {
@@ -222,36 +276,55 @@ int channel::pa_stream_callback(
     PaStreamCallbackFlags statusFlags,
     void* userData)
 {
-    static std::vector<float> buff;
-    auto& ch = *(static_cast<channel*>(userData));
-    auto out = static_cast<float*>(output);
+    static constexpr milliseconds NoSyncThreshold{ 24 };
+    static constexpr milliseconds minusNoSyncThreshold{ -24 };
+    static const double coef = std::exp(std::log(0.01) / 20);
+    auto& ch                 = *(static_cast<channel*>(userData));
+    auto out                 = static_cast<float*>(output);
 
-    packet* p       = nullptr;
-    int sampleCount = frameCount * nbChannels;
+    int sampleCount = frameCount;
     if(ch.paused)
     {
-        copy_n(ch.silentBuffer.begin(), sampleCount, out);
+        // if the channel is paused => fill the buffer with silence
+        copy_n(ch.silentBuffer.begin(), sampleCount * ch.nbChannels, out);
+        return 0;
     }
-    else
+
+    packet* p = nullptr;
+    auto ptr  = ch.audioBuffer.data();
+    while(sampleCount > 0)
     {
-        while(sampleCount > 0)
+        auto tlTs = ch.tl.get_timestamp();
+        if(!ch.audioPacketQueue.try_pop(p))
         {
-            if(ch.audioPacketQueue.try_pop(p))
-            {
-                auto* c  = p->owner;
-                auto pts = c->get_audio_frame(p->payload, buff);
-                sampleCount -= buff.size();
-                copy(buff.begin(), buff.end(), out);
-                advance(out, buff.size());
-                buff.clear();
-            }
-            else
-            {
-                copy_n(ch.silentBuffer.begin(), sampleCount, out);
-                sampleCount = 0;
-            }
+            // no available frames => fill with silence
+            copy_n(ch.silentBuffer.begin(), sampleCount * ch.nbChannels, out);
+            break;
         }
+        auto* c             = p->owner;
+        auto&& [bSize, pts] = c->get_audio_frame(p, ptr);
+        // sync code
+        //////////////////////////////////////
+        auto diff = pts - tlTs;
+        printf("%lld\n", diff.count());
+        // do we need to sync the audio?
+        // TODO: implement accurate syncing every frame
+        if(diff < minusNoSyncThreshold)
+        {
+            // skip this frame
+            continue;
+        }
+        else if(diff > NoSyncThreshold)
+        {
+            ch.lastAudioFrame.pts = pts;
+            ch.lastAudioFrame.data.assign(prev(ptr, bSize * ch.nbChannels), ptr);
+            copy_n(ch.silentBuffer.begin(), sampleCount * ch.nbChannels, out);
+            return 0;
+        }
+        //////////////////////////////////////
+        sampleCount -= bSize;
     }
+    copy(ch.audioBuffer.begin(), ch.audioBuffer.end(), out);
     return 0;
 }
 } // namespace libpgmaker

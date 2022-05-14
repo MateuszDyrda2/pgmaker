@@ -40,6 +40,8 @@ class timeline
     bool set_paused(bool value);
     void jump2(const milliseconds& ts);
 
+    milliseconds get_timestamp() const;
+
   private:
     bool paused;
     time_point start;
@@ -48,7 +50,6 @@ class timeline
     duration startOffset;
     project_settings settings;
     std::deque<std::unique_ptr<channel>> channels;
-    std::chrono::milliseconds timestamp;
 
   private:
     void initialize_audio();

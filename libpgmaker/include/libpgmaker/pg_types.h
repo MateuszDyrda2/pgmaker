@@ -27,7 +27,7 @@ struct frame
 struct audio_frame
 {
     std::vector<float> data;
-    std::chrono::milliseconds pts;
+    std::chrono::milliseconds pts{};
 };
 struct packet
 {

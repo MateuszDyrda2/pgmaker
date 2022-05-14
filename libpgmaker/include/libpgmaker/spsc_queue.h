@@ -35,12 +35,24 @@ class spsc_queue
     void notify();
     void flush();
 
+    bool top(T& obj);
+
   private:
     std::queue<T> buffer;
     mutable std::mutex mtx;
     std::condition_variable emptyCvar;
     std::condition_variable fullCvar;
 };
+template<class T, std::size_t N>
+bool spsc_queue<T, N>::top(T& obj)
+{
+    std::unique_lock lck(mtx);
+
+    if(buffer.empty()) return false;
+
+    obj = buffer.front();
+    return true;
+}
 template<class T, std::size_t N>
 bool spsc_queue<T, N>::try_pop(T& obj, const std::chrono::milliseconds& timeout)
 {

@@ -197,7 +197,7 @@ int main()
             if(jumpBack)
             {
                 jumpBack = false;
-                tl.jump2(std::chrono::milliseconds(2000));
+                tl.jump2(std::chrono::milliseconds(1000));
             }
             if(high_resolution_clock::now() - lastFrame > microseconds(1661))
             {

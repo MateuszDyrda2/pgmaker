@@ -16,6 +16,7 @@
 #include <thread>
 
 namespace libpgmaker {
+class timeline;
 class channel
 {
   public:
@@ -31,7 +32,7 @@ class channel
     static constexpr std::size_t sampleRate = 48000;
 
   public:
-    channel(/* args */);
+    channel(const timeline& tl);
     ~channel();
 
     frame* get_frame(const duration& timestamp);
@@ -52,10 +53,17 @@ class channel
     milliseconds lenght;
     worker_type decodeWorker;
     worker_type videoWorker;
+    // worker_type audioWorker;
     std::atomic_bool stopped;
     std::atomic_bool paused;
     std::vector<float> silentBuffer;
+    audio_frame lastAudioFrame;
+    std::vector<float> audioBuffer;
     PaStream* audioStream;
+    std::int64_t audioDiffCum;
+    std::size_t audioAvgCount;
+
+    const timeline& tl;
 
   private:
     void stop();
