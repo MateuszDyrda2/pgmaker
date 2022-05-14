@@ -35,8 +35,9 @@ class clip
     void reset();
     bool get_packet(AVPacket** pPacket);
     bool get_frame(AVPacket* pPacket, AVFrame** frame);
-    std::pair<std::size_t, milliseconds> get_audio_frame(packet* pPacket, float*& b);
+    std::size_t get_audio_frame(packet* pPacket, std::vector<float>& b);
     void convert_frame(AVFrame* iFrame, frame** oFrame);
+    milliseconds convert_pts(std::int64_t pts) const;
 
   private:
     std::shared_ptr<video> vid;

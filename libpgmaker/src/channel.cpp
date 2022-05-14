@@ -14,11 +14,12 @@ using namespace std;
 channel::channel(const timeline& tl):
     currentClip{ clips.end() }, prevFrame{},
     nextFrame{}, stopped{ true }, paused{ true },
-    tl(tl)
+    tl(tl), audioStream{}
 {
     silentBuffer.resize(nbChannels * nbFrames, 0.f);
+    audioBuffer.resize(nbChannels * nbFrames);
     set_paused(true);
-    init_audio();
+    // init_audio();
 }
 channel::~channel()
 {
@@ -88,6 +89,7 @@ void channel::stop()
     frameQueue.flush();
     videoPacketQueue.flush();
     audioPacketQueue.flush();
+    drop_audio();
 
     nextFrame = prevFrame = nullptr;
 }
@@ -96,7 +98,7 @@ void channel::start()
     stopped      = false;
     decodeWorker = worker_type(&channel::decoding_job, this);
     videoWorker  = worker_type(&channel::video_job, this);
-    // audioWorker  = worker_type(&channel::audio_job, this);
+    init_audio();
 }
 void channel::jump2(const chrono::milliseconds& ts)
 {
@@ -188,84 +190,51 @@ void channel::recalculate_lenght()
 }
 void channel::init_audio()
 {
-    /*
- PaStreamParameters outParams;
- outParams.channelCount              = nbChannels;
- outParams.device                    = Pa_GetDefaultOutputDevice();
- outParams.suggestedLatency          = Pa_GetDeviceInfo(outParams.device)->defaultLowOutputLatency;
- outParams.hostApiSpecificStreamInfo = NULL;
- outParams.sampleFormat              = paFloat32;
+    if(!audioStream)
+    {
+        PaStreamParameters outParams;
+        outParams.channelCount              = nbChannels;
+        outParams.device                    = Pa_GetDefaultOutputDevice();
+        outParams.suggestedLatency          = 0;
+        outParams.hostApiSpecificStreamInfo = NULL;
+        outParams.sampleFormat              = paFloat32;
 
- auto err = Pa_OpenStream(
-     &audioStream,
-     NULL,
-     &outParams,
-     sampleRate,
-     nbFrames,
-     paClipOff,
-     NULL,
-     NULL);
- if(err != paNoError)
- {
-     throw runtime_error("PortAudio failed while opening a stream with: " + string(Pa_GetErrorText(err)));
- }
- err = Pa_StartStream(audioStream);
- if(err != paNoError)
- {
-     throw runtime_error("PortAudio failed while starting a stream with: " + string(Pa_GetErrorText(err)));
- }
- */
-    /*
-        auto err = Pa_OpenDefaultStream(
+        auto err = Pa_OpenStream(
             &audioStream,
-            0,
-            nbChannels,
-            paFloat32,
+            NULL,
+            &outParams,
             sampleRate,
             nbFrames,
+            paClipOff,
             pa_stream_callback,
             this);
-            */
 
-    PaStreamParameters outParams;
-    outParams.channelCount              = nbChannels;
-    outParams.device                    = Pa_GetDefaultOutputDevice();
-    outParams.suggestedLatency          = 0;
-    outParams.hostApiSpecificStreamInfo = NULL;
-    outParams.sampleFormat              = paFloat32;
-
-    auto err = Pa_OpenStream(
-        &audioStream,
-        NULL,
-        &outParams,
-        sampleRate,
-        nbFrames,
-        paClipOff,
-        pa_stream_callback,
-        this);
-
-    if(err != paNoError)
-    {
-        throw runtime_error("PortAudio failed while opening a stream with: " + string(Pa_GetErrorText(err)));
+        if(err != paNoError)
+        {
+            throw runtime_error("PortAudio failed while opening a stream with: " + string(Pa_GetErrorText(err)));
+        }
+        err = Pa_StartStream(audioStream);
+        if(err != paNoError)
+        {
+            throw runtime_error("PortAudio failed while starting a stream with: " + string(Pa_GetErrorText(err)));
+        }
     }
-    err = Pa_StartStream(audioStream);
-    if(err != paNoError)
-    {
-        throw runtime_error("PortAudio failed while starting a stream with: " + string(Pa_GetErrorText(err)));
-    }
-    audioBuffer.resize(nbChannels * nbFrames);
 }
 void channel::drop_audio()
 {
-    auto err = Pa_StopStream(audioStream);
-    if(err != paNoError)
+    if(audioStream)
     {
-        throw runtime_error("PortAudio failed while stopping a stream with: " + string(Pa_GetErrorText(err)));
-    }
-    err = Pa_CloseStream(audioStream);
-    if(err != paNoError)
-    {
-        throw runtime_error("PortAudio failed while closing a stream with: " + string(Pa_GetErrorText(err)));
+        auto err = Pa_AbortStream(audioStream);
+        if(err != paNoError)
+        {
+            throw runtime_error("PortAudio failed while stopping a stream with: " + string(Pa_GetErrorText(err)));
+        }
+        err = Pa_CloseStream(audioStream);
+        if(err != paNoError)
+        {
+            throw runtime_error("PortAudio failed while closing a stream with: " + string(Pa_GetErrorText(err)));
+        }
+        audioStream = nullptr;
     }
 }
 int channel::pa_stream_callback(
@@ -294,37 +263,31 @@ int channel::pa_stream_callback(
     auto ptr  = ch.audioBuffer.data();
     while(sampleCount > 0)
     {
-        auto tlTs = ch.tl.get_timestamp();
-        if(!ch.audioPacketQueue.try_pop(p))
+        if(!ch.audioPacketQueue.top(p))
         {
-            // no available frames => fill with silence
             copy_n(ch.silentBuffer.begin(), sampleCount * ch.nbChannels, out);
             break;
         }
-        auto* c             = p->owner;
-        auto&& [bSize, pts] = c->get_audio_frame(p, ptr);
-        // sync code
-        //////////////////////////////////////
-        auto diff = pts - tlTs;
-        printf("%lld\n", diff.count());
-        // do we need to sync the audio?
-        // TODO: implement accurate syncing every frame
-        if(diff < minusNoSyncThreshold)
+        auto tlTs       = ch.tl.get_timestamp();
+        auto* c         = p->owner;
+        auto newPts     = c->convert_pts(p->payload->pts);
+        const auto diff = newPts - tlTs;
+        printf("%lld ==> %lld\n", tlTs.count(), newPts.count());
+        if(diff > NoSyncThreshold)
         {
-            // skip this frame
-            continue;
-        }
-        else if(diff > NoSyncThreshold)
-        {
-            ch.lastAudioFrame.pts = pts;
-            ch.lastAudioFrame.data.assign(prev(ptr, bSize * ch.nbChannels), ptr);
+            // fill with silence
             copy_n(ch.silentBuffer.begin(), sampleCount * ch.nbChannels, out);
             return 0;
         }
-        //////////////////////////////////////
+        ch.audioPacketQueue.pop();
+        if(diff < minusNoSyncThreshold)
+        {
+            continue;
+        }
+        auto bSize = c->get_audio_frame(p, ch.audioBuffer);
+        copy_n(ch.audioBuffer.begin(), bSize * ch.nbChannels, out);
         sampleCount -= bSize;
     }
-    copy(ch.audioBuffer.begin(), ch.audioBuffer.end(), out);
     return 0;
 }
 } // namespace libpgmaker

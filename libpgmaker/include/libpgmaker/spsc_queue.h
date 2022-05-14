@@ -27,6 +27,7 @@ class spsc_queue
     void pop(T& obj, F cond);
     template<class F>
     void push(const T& obj, F cond);
+    void pop();
 
     void pop(T& obj);
     void push(const T& obj);
@@ -52,6 +53,14 @@ bool spsc_queue<T, N>::top(T& obj)
 
     obj = buffer.front();
     return true;
+}
+template<class T, std::size_t N>
+void spsc_queue<T, N>::pop()
+{
+    std::unique_lock lck(mtx);
+
+    buffer.pop();
+    fullCvar.notify_one();
 }
 template<class T, std::size_t N>
 bool spsc_queue<T, N>::try_pop(T& obj, const std::chrono::milliseconds& timeout)
