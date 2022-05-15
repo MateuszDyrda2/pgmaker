@@ -1,7 +1,0 @@
-<RCC>
-    <qresource prefix="/qml" lang="qml">
-        <file alias="MainWindow">src/qml/MainWindow.qml</file>
-	<file alias="TaskBarButton">src/qml/TaskBarButton.qml</file>
-    </qresource>
-    <qresource prefix="/"/>
-</RCC>

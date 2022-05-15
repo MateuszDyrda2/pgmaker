@@ -1,39 +1,33 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.16)
 
-set(pgmaker_VERSION_MAJOR 0)
-set(pgmaker_VERSION_MINOR 1)
-set(pgmaker_VERSION_PATCH 0)
+project(layout VERSION 0.1 LANGUAGES CXX)
 
-set(pgmaker_VERSION ${pgmaker_VERSION_MAJOR}.${pgmaker_VERSION_MINOR}.${pgmaker_VERSION_PATCH})
-
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-project(PGMaker VERSION ${pgmaker_VERSION} LANGUAGES CXX C)
-
-# QT SETUP
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 6.2 COMPONENTS Quick REQUIRED)
 
-add_subdirectory(libpgmaker)
-
-set(pgmaker_SRC
-	src/main.cpp
-        pgmaker.qrc
+qt_add_executable(applayout
+    src/main.cpp
 )
 
-qt_add_executable(pgmaker ${pgmaker_SRC})
-qt_add_qml_module(pgmaker
-    URI PGMaker
-    VERSION ${pgmaker_VERSION}
-    QML_FILES
-        "src/qml/MainWindow.qml"
-        "src/qml/TaskBarButton.qml"
+qt_add_qml_module(applayout
+    URI layout
+    VERSION 1.0
+    QML_FILES 
+	"src/qml/main.qml"
+        "src/qml/MyButton.qml"
 )
 
-target_link_libraries(pgmaker PRIVATE libpgmaker Qt6::Quick)
+set_target_properties(applayout PROPERTIES
+    MACOSX_BUNDLE_GUI_IDENTIFIER my.example.com
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    MACOSX_BUNDLE TRUE
+    WIN32_EXECUTABLE TRUE
+)
 
-set_property(TARGET pgmaker PROPERTY CXX_STANDARD 17)
-set_property(TARGET pgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
-target_compile_definitions(pgmaker
+target_compile_definitions(applayout
     PRIVATE $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:QT_QML_DEBUG>)
+target_link_libraries(applayout
+    PRIVATE Qt6::Quick)
