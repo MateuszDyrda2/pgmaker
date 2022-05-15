@@ -19,14 +19,14 @@ T.Button {
       /*  states:[
          State {
              name: "normal"
-             when: !taskBarButton.down
+             when: !myButton.down
              PropertyChanges {
                  target: buttonBackground
              }
          },
          State {
              name: "down"
-             when: taskBarButton.down
+             when: myButton.down
              PropertyChanges {
                  target: buttonBackground
                  color: "red"
