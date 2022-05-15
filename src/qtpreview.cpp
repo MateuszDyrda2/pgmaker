@@ -23,6 +23,7 @@ void QtPreview::sync()
         renderer = new QtRenderer;
         connect(window(), &QQuickWindow::beforeRendering, renderer, &QtRenderer::init, Qt::DirectConnection);
         connect(window(), &QQuickWindow::beforeRenderPassRecording, renderer, &QtRenderer::paint, Qt::DirectConnection);
+        QObject::connect(this, &QtPreview::frame_sent, renderer, &QtRenderer::update_frame);
     }
     renderer->setViewportSize(window()->size() * window()->devicePixelRatio());
     renderer->setWindow(window());
@@ -46,4 +47,11 @@ void QtPreview::releaseResources()
 {
     window()->scheduleRenderJob(new CleanupJob(renderer), QQuickWindow::BeforeSynchronizingStage);
     renderer = nullptr;
+}
+void QtPreview::update_frame(libpgmaker::frame* frame)
+{
+    if(renderer)
+    {
+        emit frame_sent(frame);
+    }
 }

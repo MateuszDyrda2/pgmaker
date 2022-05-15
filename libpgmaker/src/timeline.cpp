@@ -32,6 +32,9 @@ channel* timeline::get_channel(std::size_t index)
 }
 frame* timeline::get_frame()
 {
+    if(channels.empty())
+        return nullptr;
+
     const auto timestamp = get_timestamp();
 
     vector<frame*> frames;

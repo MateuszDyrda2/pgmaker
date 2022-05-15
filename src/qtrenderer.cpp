@@ -27,11 +27,16 @@ void QtRenderer::paint()
     {
         m_window->beginExternalCommands();
         ////
+        glViewport(0, 0, viewportSize.width(), viewportSize.height());
+        glClearColor(1.0f, 0.f, 0.f, 1.f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        prev->draw();
         m_window->endExternalCommands();
     }
 }
 void QtRenderer::setViewportSize(const QSize& size)
 {
+    viewportSize = size;
     if(prev)
     {
         prev->resize(resolution{ .width  = unsigned(size.width()),
@@ -41,4 +46,11 @@ void QtRenderer::setViewportSize(const QSize& size)
 void QtRenderer::setWindow(QQuickWindow* window)
 {
     m_window = window;
+}
+void QtRenderer::update_frame(libpgmaker::frame* f)
+{
+    if(prev)
+    {
+        prev->update(f);
+    }
 }

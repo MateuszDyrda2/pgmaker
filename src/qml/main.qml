@@ -7,18 +7,20 @@ import Preview 1.0
 
 Window {
     id: window
+	objectName: "window"
     width: 1280
     height: 720
     visible: true
     color: "#555555"
     title: qsTr("pgmaker")
+	signal playPressed()
 
     FileDialog {
         id: openFileDialog
+		objectName: "openFileDialog"
         title: "Please choose a file"
-        onAccepted: {
-            console.log(openFileDialog.selectedFile)
-        }
+        signal qmlSignal(path: string)
+        onAccepted: openFileDialog.qmlSignal(openFileDialog.selectedFile)
         onRejected: {
             console.log("Canceled")
         }
@@ -26,6 +28,7 @@ Window {
 
     GridLayout {
         id: mainGridLayout
+		objectName: "grid"
         anchors.fill: parent
         columnSpacing: 5
         flow: GridLayout.TopToBottom
@@ -34,6 +37,7 @@ Window {
 
         QtPreview{
             id: centerRectangle
+			objectName: "preview"
             Layout.column: 1
             Layout.columnSpan: 3
             Layout.row: 1
@@ -172,6 +176,7 @@ Window {
                     icon.color: transparent
                     icon.width: 20
                     icon.height: 20
+					onClicked: window.playPressed()
                 }
             }
         }

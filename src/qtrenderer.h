@@ -5,9 +5,10 @@
 //#include <QOpenGLFunctions>
 #include <QQuickWindow>
 
+#include <libpgmaker/clip.h>
 #include <libpgmaker/preview.h>
 
-class QtRenderer : public QObject//, protected QOpenGLFunctions
+class QtRenderer : public QObject //, protected QOpenGLFunctions
 {
     Q_OBJECT
   public:
@@ -19,6 +20,7 @@ class QtRenderer : public QObject//, protected QOpenGLFunctions
   public slots:
     void init();
     void paint();
+    void update_frame(libpgmaker::frame* f);
 
   private:
     libpgmaker::preview* prev;

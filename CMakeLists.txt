@@ -22,6 +22,10 @@ qt_add_executable(applayout
     src/qtrenderer.h
     src/qtpreview.cpp
     src/qtrenderer.cpp
+    src/activevideos.h
+    src/activevideos.cpp
+    src/qttimeline.h
+    src/qttimeline.cpp
 )
 
 qt_add_qml_module(applayout

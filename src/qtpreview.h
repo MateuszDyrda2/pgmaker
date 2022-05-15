@@ -11,12 +11,15 @@ class QtPreview : public QQuickItem
     QML_ELEMENT
   public:
     QtPreview();
+    QtRenderer* get_renderer() const { return renderer; }
 
   signals:
+    void frame_sent(libpgmaker::frame* frame);
 
   public slots:
     void sync();
     void cleanup();
+    void update_frame(libpgmaker::frame* frame);
 
   private slots:
     void handleWindowChanged(QQuickWindow* win);
