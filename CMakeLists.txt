@@ -12,11 +12,16 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
 find_package(Qt6 6.2 COMPONENTS Quick REQUIRED)
 
 qt_add_executable(applayout
     src/main.cpp
+    src/qtpreview.h
+    src/qtrenderer.h
+    src/qtpreview.cpp
+    src/qtrenderer.cpp
 )
 
 qt_add_qml_module(applayout
@@ -24,7 +29,7 @@ qt_add_qml_module(applayout
     VERSION 1.0
     QML_FILES 
 	"src/qml/main.qml"
-        "src/qml/MyButton.qml"
+    "src/qml/MyButton.qml"
 )
 
 set_target_properties(applayout PROPERTIES
@@ -41,3 +46,5 @@ target_compile_definitions(applayout
 target_link_libraries(applayout
     PRIVATE Qt6::Quick
 	PUBLIC libpgmaker)
+
+target_include_directories(libpgmaker PUBLIC src)
