@@ -1,13 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(layout VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(pgmaker_VERSION_MAJOR 0)
 set(pgmaker_VERSION_MINOR 1)
 set(pgmaker_VERSION_PATCH 0)
+set(pgmaker_VERSION ${pgmaker_VERSION_MAJOR}.${pgmaker_VERSION_MINOR}.${pgmaker_VERSION_PATCH})
+
+project(layout VERSION ${pgmaker_VERSION} LANGUAGES CXX)
 
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(Qt6 6.2 COMPONENTS Quick REQUIRED)
 
