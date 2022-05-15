@@ -140,6 +140,8 @@ bool clip::get_packet(AVPacket** pPacket)
     const auto time      = (*pPacket)->pts * vidTimebase.num / (double)vidTimebase.den;
     const auto millitime = chrono::duration<double>(time);
     const auto endtime   = vid->get_info().duration - endOffset;
+    vidCurrentStreamPos  = (*pPacket)->pos;
+    vidCurrentTs         = (*pPacket)->pts;
 
     return (millitime < endtime);
 }
@@ -208,12 +210,6 @@ std::size_t clip::get_audio_frame(packet* pPacket, vector<float>& b)
                                     frame->nb_samples);
         std::advance(ptr, cSamples * nbChannels);
         bSize += cSamples;
-        /*
-        const auto pts = frame->pts * audioTimebase.num / double(audioTimebase.den);
-        const auto ts  = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));
-        if(realTs == chrono::milliseconds(0))
-            realTs = startsAt - startOffset + ts;
-        */
 
         av_frame_free(&frame);
     }
@@ -226,16 +222,54 @@ bool clip::contains(const std::chrono::milliseconds& ts) const
 }
 bool clip::seek(const milliseconds& ts)
 {
+    // TODO: fix
     assert(ts >= startsAt);
     assert(ts <= startsAt + get_duration());
-    auto regTs   = chrono::duration_cast<chrono::duration<double>>(ts - startsAt + startOffset);
-    uint64_t pts = regTs.count() * vidTimebase.den / (double)vidTimebase.num;
-    return (avformat_seek_file(pFormatCtx, vsIndex, INT64_MIN, pts, INT64_MAX, 0) >= 0);
+
+    auto currentPos = video_convert_pts(vidCurrentTs);
+    auto diff       = ts - currentPos;
+
+    const auto currentPosInSec = chrono::duration_cast<chrono::duration<double>>(currentPos);
+    const auto diffInSec       = chrono::duration_cast<chrono::duration<double>>(diff);
+    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(ts);
+
+    std::int64_t curr = currentPosInSec.count() * AV_TIME_BASE;
+    std::int64_t inc  = diffInSec.count() * AV_TIME_BASE;
+    std::int64_t req  = reqInSec.count() * AV_TIME_BASE;
+
+    std::int64_t seekMin = inc > 0 ? curr + 2 : INT64_MIN;
+    std::int64_t seekMax = inc < 0 ? curr - 2 : INT64_MAX;
+
+    auto err = avformat_seek_file(pFormatCtx, -1, seekMin, req, seekMax, 0);
+    if(err < 0)
+    {
+        char buffer[128];
+        av_strerror(err, buffer, sizeof(buffer));
+        printf("%s\n", buffer);
+        return false;
+    }
+    return true;
 }
-clip::milliseconds clip::convert_pts(std::int64_t pts) const
+clip::milliseconds clip::audio_convert_pts(std::int64_t pts) const
 {
     const auto p  = pts * audioTimebase.num / double(audioTimebase.den);
     const auto ts = chrono::duration_cast<milliseconds>(chrono::duration<double>(p));
     return startsAt - startOffset + ts;
+}
+std::int64_t clip::audio_reconvert_pts(const milliseconds& pts) const
+{
+    const auto regTs = chrono::duration_cast<chrono::duration<double>>(pts - startsAt + startOffset);
+    return regTs.count() * audioTimebase.den / (double)audioTimebase.num;
+}
+clip::milliseconds clip::video_convert_pts(std::int64_t pts) const
+{
+    const auto p  = pts * vidTimebase.num / double(vidTimebase.den);
+    const auto ts = chrono::duration_cast<milliseconds>(chrono::duration<double>(p));
+    return startsAt - startOffset + ts;
+}
+std::int64_t clip::video_reconvert_pts(const milliseconds& pts) const
+{
+    const auto regTs = chrono::duration_cast<chrono::duration<double>>(pts - startsAt + startOffset);
+    return regTs.count() * vidTimebase.den / (double)vidTimebase.num;
 }
 }

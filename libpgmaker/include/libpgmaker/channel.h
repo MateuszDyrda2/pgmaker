@@ -57,13 +57,13 @@ class channel
     std::atomic_bool stopped;
     std::atomic_bool paused;
     std::vector<float> silentBuffer;
-    audio_frame lastAudioFrame;
     std::vector<float> audioBuffer;
     PaStream* audioStream;
-    std::int64_t audioDiffCum;
-    std::size_t audioAvgCount;
 
     const timeline& tl;
+
+    std::atomic_bool seek;
+    std::int64_t seekPts;
 
   private:
     void stop();

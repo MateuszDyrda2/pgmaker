@@ -116,6 +116,8 @@ void channel::jump2(const chrono::milliseconds& ts)
     {
         throw runtime_error("Failed to jump to requested timestamp");
     }
+    seek.store(true, memory_order_relaxed);
+    seekPts = cl->video_reconvert_pts(ts);
 
     start();
 }
@@ -131,6 +133,11 @@ void channel::decoding_job()
             {
                 if(pPacket->stream_index == c->vsIndex)
                 {
+                    if(seek)
+                    {
+                        printf("%lld - %lld\n", pPacket->pts, seekPts);
+                        seek = false;
+                    }
                     auto p = new packet{ c.get(), pPacket };
                     videoPacketQueue.push(p, [this] { return stopped == true; });
                 }
@@ -247,36 +254,39 @@ int channel::pa_stream_callback(
 {
     static constexpr milliseconds NoSyncThreshold{ 24 };
     static constexpr milliseconds minusNoSyncThreshold{ -24 };
-    static const double coef = std::exp(std::log(0.01) / 20);
-    auto& ch                 = *(static_cast<channel*>(userData));
-    auto out                 = static_cast<float*>(output);
+    auto& ch               = *(static_cast<channel*>(userData));
+    auto out               = static_cast<float*>(output);
+    auto& audioPacketQueue = ch.audioPacketQueue;
+    auto& silentBuffer     = ch.silentBuffer;
+    auto& audioBuffer      = ch.audioBuffer;
+    auto& tl               = ch.tl;
+    const auto& nbChannels = ch.nbChannels;
 
     int sampleCount = frameCount;
     if(ch.paused)
     {
         // if the channel is paused => fill the buffer with silence
-        copy_n(ch.silentBuffer.begin(), sampleCount * ch.nbChannels, out);
+        copy_n(silentBuffer.begin(), sampleCount * nbChannels, out);
         return 0;
     }
 
     packet* p = nullptr;
-    auto ptr  = ch.audioBuffer.data();
+    auto ptr  = audioBuffer.data();
     while(sampleCount > 0)
     {
-        if(!ch.audioPacketQueue.top(p))
+        if(!audioPacketQueue.top(p))
         {
-            copy_n(ch.silentBuffer.begin(), sampleCount * ch.nbChannels, out);
+            copy_n(silentBuffer.begin(), sampleCount * nbChannels, out);
             break;
         }
-        auto tlTs       = ch.tl.get_timestamp();
+        auto tlTs       = tl.get_timestamp();
         auto* c         = p->owner;
-        auto newPts     = c->convert_pts(p->payload->pts);
+        auto newPts     = c->audio_convert_pts(p->payload->pts);
         const auto diff = newPts - tlTs;
-        printf("%lld ==> %lld\n", tlTs.count(), newPts.count());
         if(diff > NoSyncThreshold)
         {
             // fill with silence
-            copy_n(ch.silentBuffer.begin(), sampleCount * ch.nbChannels, out);
+            copy_n(silentBuffer.begin(), sampleCount * nbChannels, out);
             return 0;
         }
         ch.audioPacketQueue.pop();
@@ -284,8 +294,8 @@ int channel::pa_stream_callback(
         {
             continue;
         }
-        auto bSize = c->get_audio_frame(p, ch.audioBuffer);
-        copy_n(ch.audioBuffer.begin(), bSize * ch.nbChannels, out);
+        auto bSize = c->get_audio_frame(p, audioBuffer);
+        copy_n(audioBuffer.begin(), bSize * nbChannels, out);
         sampleCount -= bSize;
     }
     return 0;

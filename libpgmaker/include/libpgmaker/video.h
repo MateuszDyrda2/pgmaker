@@ -15,7 +15,7 @@ struct video_info
 {
     std::uint32_t width, height;
     std::chrono::milliseconds duration;
-    std::uint64_t bitrate;
+    std::int64_t bitrate;
     int pixelFormat;
     int codecId;
 };
