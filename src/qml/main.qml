@@ -3,7 +3,7 @@ import QtQuick.Window 2.3
 import QtQuick.Controls 2.5
 import QtQuick.Dialogs
 import QtQuick.Layouts 6.0
-
+import Preview 1.0
 
 Window {
     id: window
@@ -21,13 +21,12 @@ Window {
         columns: 5
         rows: 5
 
-        Rectangle{
+        QtPreview{
             id: centerRectangle
             Layout.column: 1
             Layout.columnSpan: 3
             Layout.row: 1
             Layout.rowSpan: 3
-            color: white
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
             Layout.fillWidth: true
