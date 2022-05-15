@@ -13,6 +13,17 @@ Window {
     color: "#555555"
     title: qsTr("pgmaker")
 
+    FileDialog {
+        id: openFileDialog
+        title: "Please choose a file"
+        onAccepted: {
+            console.log(openFileDialog.selectedFile)
+        }
+        onRejected: {
+            console.log("Canceled")
+        }
+    }
+
     GridLayout {
         id: mainGridLayout
         anchors.fill: parent
@@ -113,6 +124,9 @@ Window {
                     text: "Import"
                     Layout.minimumWidth: 40
                     Layout.maximumWidth: 80
+                    onClicked: {
+                        openFileDialog.open();
+                    }
                 }
                 MyButton {
                     id: blockEditorButton
