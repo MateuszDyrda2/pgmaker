@@ -18,6 +18,14 @@ struct resolution
 {
     std::uint32_t width, height;
 };
+static bool operator==(const resolution& lhs, const resolution& rhs)
+{
+    return lhs.width == rhs.width && lhs.height == rhs.height;
+}
+static bool operator!=(const resolution& lhs, const resolution& rhs)
+{
+    return !(lhs == rhs);
+}
 struct frame
 {
     resolution size;
