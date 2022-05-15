@@ -3,6 +3,7 @@ import QtQuick.Window 2.3
 import QtQuick.Controls 2.5
 import QtQuick.Dialogs
 import QtQuick.Layouts 6.0
+import QtMultimedia 5.9
 
 
 Window {
@@ -12,12 +13,14 @@ Window {
     visible: true
     color: "#555555"
     title: qsTr("pgmaker")
+    property string variableForVideoPath: ""
 
     FileDialog {
             id: openFileDialog
             title: "Please choose a file"
             onAccepted: {
                 console.log(openFileDialog.selectedFile)
+                variableForVideoPath = openFileDialog.selectedFile
             }
             onRejected: {
                 console.log("Canceled")
@@ -42,6 +45,25 @@ Window {
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
             Layout.fillWidth: true
+
+            Video {
+                id: video
+                width : 800
+                height : 600
+                source: variableForVideoPath
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        video.play()
+                    }
+                }
+
+                focus: true
+                Keys.onSpacePressed: video.playbackState == MediaPlayer.PlayingState ? video.pause() : video.play()
+                Keys.onLeftPressed: video.seek(video.position - 5000)
+                Keys.onRightPressed: video.seek(video.position + 5000)
+            }
         }
         Rectangle {
             id: leftBarRectangle
