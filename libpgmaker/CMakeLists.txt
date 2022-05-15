@@ -81,7 +81,7 @@ target_link_libraries(libpgmaker
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
 
-option(libpgmaker_BUILDSANDBOX "Build sandbox for library" ON)
+option(libpgmaker_BUILDSANDBOX "Build sandbox for library" OFF)
 
 if(libpgmaker_BUILDSANDBOX)
 	find_package(glfw3 REQUIRED)
