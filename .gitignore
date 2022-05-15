@@ -7,3 +7,4 @@ build/
 #cmake generated
 CMakeLists.txt.user
 CMakeSettings.json
+.cache
