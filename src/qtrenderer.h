@@ -2,10 +2,12 @@
 #define QTRENDERER_H
 
 #include <QObject>
-#include <QOpenGLFunctions>
+//#include <QOpenGLFunctions>
 #include <QQuickWindow>
 
-class QtRenderer : public QObject, protected QOpenGLFunctions
+#include <libpgmaker/preview.h>
+
+class QtRenderer : public QObject//, protected QOpenGLFunctions
 {
     Q_OBJECT
   public:
@@ -19,6 +21,7 @@ class QtRenderer : public QObject, protected QOpenGLFunctions
     void paint();
 
   private:
+    libpgmaker::preview* prev;
     QSize viewportSize;
     QQuickWindow* m_window;
 };
