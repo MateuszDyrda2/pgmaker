@@ -31,7 +31,9 @@ set_target_properties(applayout PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
+add_subdirectory(libpgmaker)
 target_compile_definitions(applayout
     PRIVATE $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:QT_QML_DEBUG>)
 target_link_libraries(applayout
-    PRIVATE Qt6::Quick)
+    PRIVATE Qt6::Quick
+	PUBLIC libpgmaker)
