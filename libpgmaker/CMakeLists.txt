@@ -4,29 +4,30 @@ set(libpgmaker_VERSION ${pgmaker_VERSION})
 
 set(FFMPEG_DIRECTORY "C:/ffmpeg/" CACHE STRING "Where to find ffmpeg" FORCE)
 
-find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE)
+find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE SWRESAMPLE)
 if(NOT ${FFMPEG_FOUND})
 	if(WIN32)	
         set(PC_SWSCALE_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
         set(PC_AVUTIL_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
         set(PC_AVFORMAT_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
         set(PC_AVCODEC_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
+        set(PC_SWRESAMPLE_INCLUDE_DIRS ${FFMPEG_DIRECTORY}include)
 
         set(PC_SWSCALE_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
         set(PC_AVUTIL_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
         set(PC_AVFORMAT_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
         set(PC_AVCODEC_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
-		find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE REQUIRED)
+        set(PC_SWRESAMPLE_LIBRARY_DIRS ${FFMPEG_DIRECTORY}lib)
+		find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE SWRESAMPLE REQUIRED)
 	else()
 		message(FATAL_ERROR "Make sure the ffmpeg library is installed")
 	endif()
 endif()
 
 
-find_package(OpenAL)
-
 add_subdirectory(lib/glad)
 add_subdirectory(lib/glm)
+add_subdirectory(lib/portaudio)
 
 project(libpgmaker VERSION ${libpgmaker_VERSION} LANGUAGES CXX C)
 
@@ -35,14 +36,15 @@ set(FFMPEG_LIBS
 	${AVCODEC_LIBRARIES}
 	${AVUTIL_LIBRARIES}
 	${SWSCALE_LIBRARIES}
+	${SWRESAMPLE_LIBRARIES}
 )
 set(FFMPEG_INCLUDE
 	${AVFORMAT_INCLUDE_DIRS}
 	${AVCODEC_INCLUDE_DIRS}
 	${AVUTILS_INCLUDE_DIRS}
 	${SWSCALE_INCLUDE_DIRS}
+	${SWRESAMPLE_INCLUDE_DIRS}
 )
-find_package(Boost COMPONENTS thread system REQUIRED)
 
 set(libpgmaker_SRC
 	src/video_reader.cpp
@@ -59,7 +61,6 @@ target_include_directories(libpgmaker
 	include/
 	PRIVATE
 	${FFMPEG_INCLUDE}
-	${Boost_INCLUDE_DIRS}
 )
 if(WIN32)
     set(GLM_LIB glm::glm)
@@ -68,24 +69,14 @@ else()
 endif()
 
 
-if(${OPENAL_FOUND})
-	target_link_libraries(libpgmaker
-		PUBLIC
-		${FFMPEG_LIBS}
-	    ${OPENAL_LIBRARY}
-		glad
-	    ${GLM_LIB}
-		${Boost_LIBRARIES}
-	)
-else()
-	target_link_libraries(libpgmaker
-		PUBLIC
-		${FFMPEG_LIBS}
-		glad
-	    ${GLM_LIB}
-		${Boost_LIBRARIES}
-	)
-endif()
+target_link_libraries(libpgmaker
+	PUBLIC
+	${FFMPEG_LIBS}
+	PortAudio
+	glad
+    ${GLM_LIB}
+)
+
 
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD 17)
 set_property(TARGET libpgmaker PROPERTY CXX_STANDARD_REQUIRED ON)
@@ -98,3 +89,6 @@ if(libpgmaker_BUILDSANDBOX)
 	add_executable(libpgmaker_sandbox sandbox/main.cpp)
 	target_link_libraries(libpgmaker_sandbox PUBLIC libpgmaker glfw)
 endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+

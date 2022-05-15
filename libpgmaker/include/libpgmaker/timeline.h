@@ -9,6 +9,11 @@ namespace libpgmaker {
 class timeline
 {
   public:
+    using time_point   = channel::time_point;
+    using milliseconds = channel::milliseconds;
+    using duration     = channel::duration;
+
+  public:
     /** @brief Create a timeline specifying the settings.
      * The settings can be changed at any moment
      * @param settings project settings
@@ -31,11 +36,24 @@ class timeline
      * @param delta time in milliseconds since last time this function was called
      * @return pointer to the requested frame
      */
-    std::shared_ptr<frame> tick_frame(const std::chrono::milliseconds& delta);
+    frame* get_frame();
+    bool set_paused(bool value);
+    void jump2(const milliseconds& ts);
+
+    milliseconds get_timestamp() const;
 
   private:
+    bool paused;
+    time_point start;
+    time_point pauseStarted;
+    duration pausedOffset;
+    duration startOffset;
     project_settings settings;
     std::deque<std::unique_ptr<channel>> channels;
-    std::chrono::milliseconds timestamp;
+
+  private:
+    void initialize_audio();
+    void drop_audio();
+    void rebuild();
 };
 } // namespace libpgmaker

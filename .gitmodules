@@ -1,3 +1,6 @@
 [submodule "libpgmaker/lib/glm"]
 	path = libpgmaker/lib/glm
 	url = https://github.com/g-truc/glm.git
+[submodule "libpgmaker/lib/portaudio"]
+	path = libpgmaker/lib/portaudio
+	url = https://github.com/PortAudio/portaudio.git

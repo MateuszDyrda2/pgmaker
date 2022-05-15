@@ -138,6 +138,7 @@ std::shared_ptr<video> video_reader::load_file(const std::string& path)
         chrono::duration<double, std::milli>(duration));
     info.pixelFormat = pCodecCtx->pix_fmt;
     info.codecId     = pCodecCtx->codec_id;
+    info.bitrate     = pCodecCtx->bit_rate;
 
     thumbnail tn{ width, height, unique_ptr<uint8_t[]>(buffer) };
 

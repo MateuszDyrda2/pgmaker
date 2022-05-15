@@ -16,13 +16,21 @@ class preview
      */
     void resize(const resolution& newSize);
     void update(frame* newFrame);
-    unsigned int get_texture_handle() const;
+    void draw();
 
   private:
     resolution size;
+    resolution textureSize;
     unsigned int texture;
+    unsigned int shaderProgram;
+    unsigned int vao;
 
   private:
     void initialize_texture();
+    void initialize_shaders();
+    void initialize_vao();
+    void drop_texture();
+    void drop_shaders();
+    void drop_vao();
 };
 } // namespace libpgmaker
