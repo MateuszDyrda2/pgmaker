@@ -105,6 +105,12 @@ timeline::milliseconds timeline::get_timestamp() const
 {
     using namespace chrono;
 
+    if(paused)
+    {
+        return duration_cast<milliseconds>(
+            pauseStarted - start - pausedOffset + startOffset);
+    }
+
     return duration_cast<milliseconds>(
         high_resolution_clock::now() - start - pausedOffset + startOffset);
 }

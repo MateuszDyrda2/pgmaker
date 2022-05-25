@@ -83,36 +83,35 @@ std::shared_ptr<video> video_reader::load_file(const std::string& path)
     if(!pPacket)
     {
         // do sth
+        throw runtime_error("Could not allocate packet");
     }
 
     pFrame = av_frame_alloc();
     if(!pFrame)
     {
         // do sth
+        throw runtime_error("Could not allocate frame");
     }
+
     while(av_read_frame(pFormatCtx, pPacket) >= 0)
     {
-        if(pPacket->stream_index == vsIndex)
+        if(pPacket->stream_index != vsIndex)
         {
-            if(avcodec_send_packet(pCodecCtx, pPacket) < 0)
-                throw runtime_error("Failed to decode a packet");
-            if(int response = avcodec_receive_frame(pCodecCtx, pFrame);
-               response == AVERROR(EAGAIN) || response == AVERROR_EOF)
-            {
-                av_packet_unref(pPacket);
-            }
-            else if(response < 0)
-                throw runtime_error("Failed to decode a packet");
-            else
-            {
-                av_packet_unref(pPacket);
-                break;
-            }
+            continue;
         }
-        else
+        auto response = avcodec_send_packet(pCodecCtx, pPacket);
+        if(response < 0)
+            throw runtime_error("Failed to decode a packet");
+
+        response = avcodec_receive_frame(pCodecCtx, pFrame);
+        if(response == AVERROR(EAGAIN) || response == AVERROR_EOF)
         {
-            av_packet_unref(pPacket);
+            continue;
         }
+        else if(response < 0)
+            throw runtime_error("Failed to decode a packet");
+        av_packet_unref(pPacket);
+        break;
     }
     // convert to rgba
     swsCtx = sws_getContext(width, height, pCodecCtx->pix_fmt,
@@ -120,7 +119,7 @@ std::shared_ptr<video> video_reader::load_file(const std::string& path)
                             SWS_BILINEAR, NULL, NULL, NULL);
     if(!swsCtx)
     {
-        // do sth
+        throw runtime_error("Failed to allocate sws context");
     }
     unsigned char* buffer  = new unsigned char[width * height * 4];
     unsigned char* dest[4] = { buffer, NULL, NULL, NULL };

@@ -212,4 +212,8 @@ void preview::drop_shaders()
         glDeleteProgram(shaderProgram);
     }
 }
+unsigned int preview::draw2Texture()
+{
+    return texture;
+}
 } // namespace libpgmaker
