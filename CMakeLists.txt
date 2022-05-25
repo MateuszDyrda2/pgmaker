@@ -26,6 +26,8 @@ qt_add_executable(applayout
     src/activevideos.cpp
     src/qttimeline.h
     src/qttimeline.cpp
+    src/fbitem.h
+    src/fbitem.cpp
 )
 
 qt_add_qml_module(applayout

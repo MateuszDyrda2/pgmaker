@@ -3,6 +3,7 @@ import QtQuick.Window 2.3
 import QtQuick.Controls 2.5
 import QtQuick.Dialogs
 import QtQuick.Layouts 6.0
+import fbitem 1.0
 import Preview 1.0
 
 Window {
@@ -35,7 +36,7 @@ Window {
         columns: 5
         rows: 5
 
-        QtPreview{
+        FbItem {
             id: centerRectangle
 			objectName: "preview"
             Layout.column: 1
