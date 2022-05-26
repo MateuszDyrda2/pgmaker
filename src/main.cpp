@@ -262,7 +262,7 @@ void create_timeline(timeline& tl)
                     auto ends     = cl->get_duration().count();
                     auto stDiv    = starts / double(timemax);
                     auto edDiv    = ends / double(timemax);
-                    auto clipXMin = xmin + stDiv * (xmax - xmin),
+                    float clipXMin = xmin + stDiv * (xmax - xmin),
                          clipXMax = xmin + edDiv * (xmax - xmin);
                     drawList->AddRectFilled(
                         { clipXMin, canvasPos.y },
@@ -281,7 +281,7 @@ void create_timeline(timeline& tl)
                 }
             }
             const auto ts = tl.get_timestamp().count();
-            auto xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
+            float xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
             drawList->AddLine(
                 { xlinepos, canvasPos.y },
                 { xlinepos, canvasPos.y + canvasSize.y },
