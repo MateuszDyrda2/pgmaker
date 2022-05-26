@@ -41,6 +41,38 @@ bool channel::add_clip(const shared_ptr<video>& vid, const chrono::milliseconds&
     start();
     return true;
 }
+bool channel::append_clip(const std::shared_ptr<video>& vid)
+{
+    return add_clip(vid, lenght);
+}
+clip* channel::get_clip(std::size_t index)
+{
+    auto it = clips.begin();
+    std::advance(it, index);
+    return it->get();
+}
+const clip* channel::get_clip(std::size_t index) const
+{
+    auto it = clips.begin();
+    std::advance(it, index);
+    return it->get();
+}
+clip* channel::operator[](std::size_t index)
+{
+    return get_clip(index);
+}
+const clip* channel::operator[](std::size_t index) const
+{
+    return get_clip(index);
+}
+std::list<std::unique_ptr<clip>>& channel::get_clips()
+{
+    return clips;
+}
+const std::list<std::unique_ptr<clip>>& channel::get_clips() const
+{
+    return clips;
+}
 frame* channel::get_frame(const duration& timestamp)
 {
     if(paused)

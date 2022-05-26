@@ -180,8 +180,8 @@ void create_main_dockspace(timeline& tl, std::vector<std::shared_ptr<video>>& vi
             create_timeline(tl);
             create_videos(videos);
             create_properties();
-            create_playback(tl);
             create_node_editor();
+            create_playback(tl);
         }
     }
     ImGui::End();
@@ -241,16 +241,44 @@ void create_timeline(timeline& tl)
             auto canvasSize                 = ImGui::GetContentRegionAvail();
             auto canvasPos                  = ImGui::GetCursorScreenPos();
             static constexpr auto textWidth = 100.f;
-            ImRect region(
-                { canvasPos.x + textWidth, canvasPos.y },
-                { canvasPos.x + canvasSize.x - textWidth, canvasPos.x + canvasSize.x - textWidth });
-            ImGui::InvisibleButton("canvas", ImVec2(canvasSize.x - canvasPos.x, 60));
-            drawList->AddRectFilled(
-                { canvasPos.x + textWidth, canvasPos.y },
-                ImVec2(canvasSize.x + canvasPos.x, canvasPos.y + 60), 0xFF3D3837, 0);
-            drawList->AddText(canvasPos, 0xFFFFFFFF, "Channel 1");
-        }
+            float xmin                      = canvasPos.x + textWidth;
+            float xmax                      = canvasPos.x + canvasSize.x;
+            float channelHeight = 60, channelMargin = 10;
 
+            std::size_t index  = 0;
+            const auto timemax = std::chrono::milliseconds(20000).count();
+            for(const auto& ch : tl.get_channels())
+            {
+                ImGui::InvisibleButton("canvas", ImVec2(canvasSize.x - canvasPos.x, channelHeight));
+                float spacing = index * (channelHeight + channelMargin);
+                drawList->AddRectFilled(
+                    { xmin, canvasPos.y },
+                    { xmax, canvasPos.y + channelHeight },
+                    0xFF3D3837, 0);
+                drawList->AddText(canvasPos, 0xFFFFFFFF, "Channel 1");
+                for(const auto& cl : ch->get_clips())
+                {
+                    auto starts   = cl->get_starts_at().count();
+                    auto ends     = cl->get_duration().count();
+                    auto stDiv    = starts / double(timemax);
+                    auto edDiv    = ends / double(timemax);
+                    auto clipXMin = xmin + stDiv * (xmax - xmin),
+                         clipXMax = xmin + edDiv * (xmax - xmin);
+                    drawList->AddRectFilled(
+                        { clipXMin, canvasPos.y },
+                        { clipXMax, canvasPos.y + channelHeight },
+                        0xFF0000AA, 0);
+                }
+                ++index;
+            }
+            const auto ts = tl.get_timestamp().count();
+            auto xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
+            drawList->AddLine(
+                { xlinepos, canvasPos.y },
+                { xlinepos, canvasPos.y + canvasSize.y },
+                0xFFFF0000,
+                3.f);
+        }
         if(ImGui::BeginDragDropTarget())
         {
             if(const auto payload = ImGui::AcceptDragDropPayload("demo"))

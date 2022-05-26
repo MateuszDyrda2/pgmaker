@@ -37,6 +37,14 @@ class channel
 
     frame* get_frame(const duration& timestamp);
     bool add_clip(const std::shared_ptr<video>& vid, const milliseconds& at);
+    bool append_clip(const std::shared_ptr<video>& vid);
+    clip* get_clip(std::size_t index);
+    const clip* get_clip(std::size_t index) const;
+    clip* operator[](std::size_t index);
+    const clip* operator[](std::size_t index) const;
+    std::list<std::unique_ptr<clip>>& get_clips();
+    const std::list<std::unique_ptr<clip>>& get_clips() const;
+
     void jump2(const milliseconds& ts);
 
     milliseconds get_lenght() const { return lenght; }

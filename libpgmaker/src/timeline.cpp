@@ -30,6 +30,27 @@ channel* timeline::get_channel(std::size_t index)
     assert(index < channels.size());
     return channels[index].get();
 }
+channel* timeline::operator[](std::size_t index)
+{
+    return channels[index].get();
+}
+const channel* timeline::get_channel(std::size_t index) const
+{
+    assert(index < channels.size());
+    return channels[index].get();
+}
+std::deque<std::unique_ptr<channel>>& timeline::get_channels()
+{
+    return channels;
+}
+const std::deque<std::unique_ptr<channel>>& timeline::get_channels() const
+{
+    return channels;
+}
+const channel* timeline::operator[](std::size_t index) const
+{
+    return channels[index].get();
+}
 frame* timeline::get_frame()
 {
     if(channels.empty())

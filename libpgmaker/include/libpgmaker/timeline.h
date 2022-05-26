@@ -30,6 +30,11 @@ class timeline
     void remove_channel(std::size_t index);
     /** @return Returns a channel with index specified */
     channel* get_channel(std::size_t index);
+    channel* operator[](std::size_t index);
+    const channel* get_channel(std::size_t index) const;
+    const channel* operator[](std::size_t index) const;
+    const std::deque<std::unique_ptr<channel>>& get_channels() const;
+    std::deque<std::unique_ptr<channel>>& get_channels();
     /** @brief Move playback by specified delta.
      * Depending on the delta sometimes the returned frame will be
      * the same frame as the last one or some frames may be skipped
