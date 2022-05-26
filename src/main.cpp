@@ -283,9 +283,8 @@ void create_timeline(timeline& tl)
         {
             if(const auto payload = ImGui::AcceptDragDropPayload("demo"))
             {
-                tl.get_channel(0)->add_clip(
-                    *static_cast<std::shared_ptr<video>*>(payload->Data),
-                    std::chrono::milliseconds(0));
+                tl.get_channel(0)->append_clip(
+                    *static_cast<std::shared_ptr<video>*>(payload->Data));
             }
             ImGui::EndDragDropTarget();
         }

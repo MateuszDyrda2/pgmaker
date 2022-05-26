@@ -14,7 +14,7 @@ using namespace std;
 channel::channel(const timeline& tl):
     currentClip{ clips.end() }, prevFrame{},
     nextFrame{}, stopped{ true }, paused{ true },
-    tl(tl), audioStream{}
+    tl(tl), audioStream{}, lenght(0)
 {
     silentBuffer.resize(nbChannels * nbFrames, 0.f);
     audioBuffer.resize(nbChannels * nbFrames);
