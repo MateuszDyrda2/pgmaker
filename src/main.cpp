@@ -246,7 +246,7 @@ void create_timeline(timeline& tl)
             float channelHeight = 60, channelMargin = 10;
 
             std::size_t index  = 0;
-            const auto timemax = std::chrono::milliseconds(20000).count();
+            const auto timemax = 20000;
             for(const auto& ch : tl.get_channels())
             {
                 ImGui::InvisibleButton("canvas", ImVec2(canvasSize.x - canvasPos.x, channelHeight));
@@ -270,6 +270,15 @@ void create_timeline(timeline& tl)
                         0xFF0000AA, 0);
                 }
                 ++index;
+            }
+            if(ImGui::IsItemActive())
+            {
+                auto mousePos = io.MouseClickedPos[0];
+                if(mousePos.x >= xmin && mousePos.x <= xmax)
+                {
+                    auto timePos = (mousePos.x - xmin) / (xmax - xmin) * timemax;
+                    tl.jump2(std::chrono::milliseconds(std::int64_t(timePos)));
+                }
             }
             const auto ts = tl.get_timestamp().count();
             auto xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
