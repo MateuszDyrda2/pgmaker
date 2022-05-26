@@ -25,7 +25,7 @@ void CheckOpenGLError(const char* stmt, const char* fname, int line)
     }                                                \
     while(0)
 
-preview::preview(const resolution& size):
+preview::preview(const std::pair<std::uint32_t, std::uint32_t>& size):
     size(size), texture(0)
 {
     initialize_shaders();
@@ -38,7 +38,7 @@ preview::~preview()
     drop_vao();
     drop_shaders();
 }
-void preview::resize(const resolution& newSize)
+void preview::resize(const std::pair<std::uint32_t, std::uint32_t>& newSize)
 {
     size = newSize;
 }
@@ -50,20 +50,20 @@ void preview::update(frame* newFrame)
     if(newFrame->size != textureSize)
     {
         textureSize = newFrame->size;
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureSize.width, textureSize.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureSize.first, textureSize.second, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
     }
     else
     {
         GL_CHECK(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-                                 textureSize.width, textureSize.height, GL_RGBA,
-                                 GL_UNSIGNED_BYTE, newFrame->data.get()));
+                                 textureSize.first, textureSize.second, GL_RGBA,
+                                 GL_UNSIGNED_BYTE, newFrame->data.data()));
     }
 
-    mat4 viewProj = ortho(float(size.width) * -0.5f, float(size.width) * 0.5f,
-                          float(size.height) * 0.5f, float(size.height) * -0.5f);
+    mat4 viewProj = ortho(float(size.first) * -0.5f, float(size.first) * 0.5f,
+                          float(size.second) * 0.5f, float(size.second) * -0.5f);
     viewProj      = scale(viewProj,
-                          vec3(float(newFrame->size.width),
-                               float(newFrame->size.height), 1.f));
+                          vec3(float(newFrame->size.first),
+                               float(newFrame->size.second), 1.f));
     GL_CHECK(glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, value_ptr(viewProj)));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
     GL_CHECK(glUseProgram(0));
@@ -86,7 +86,7 @@ void preview::initialize_texture()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                 size.width, size.height, 0,
+                 size.first, size.second, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
 }

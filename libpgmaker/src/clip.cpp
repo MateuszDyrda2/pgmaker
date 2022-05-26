@@ -164,15 +164,16 @@ bool clip::get_frame(AVPacket* pPacket, AVFrame** frame)
 }
 void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
 {
-    auto buff             = new std::uint8_t[width * height * 4];
-    std::uint8_t* dest[4] = { buff, nullptr, nullptr, nullptr };
+    // auto buff             = new std::uint8_t[width * height * 4];
+    std::vector<std::uint8_t> buff(width * height * 4);
+    std::uint8_t* dest[4] = { buff.data(), nullptr, nullptr, nullptr };
     int destLineSize[4]   = { int(width) * 4, 0, 0, 0 };
     sws_scale(swsCtx, iFrame->data, iFrame->linesize,
               0, iFrame->height,
               dest, destLineSize);
 
     (*oFrame)->size   = { width, height };
-    (*oFrame)->data   = unique_ptr<std::uint8_t[]>(buff);
+    (*oFrame)->data   = std::move(buff);
     const auto pts    = iFrame->pts * vidTimebase.num / double(vidTimebase.den);
     const auto ts     = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));
     const auto realTs = startsAt - startOffset + ts;

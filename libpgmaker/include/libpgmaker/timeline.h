@@ -38,6 +38,7 @@ class timeline
      */
     frame* get_frame();
     bool set_paused(bool value);
+    bool is_paused() { return paused; }
     void jump2(const milliseconds& ts);
 
     milliseconds get_timestamp() const;

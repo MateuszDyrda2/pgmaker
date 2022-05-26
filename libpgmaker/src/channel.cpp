@@ -62,7 +62,11 @@ frame* channel::get_frame(const duration& timestamp)
     {
         while(timestamp > pts)
         {
-            prevFrame = nextFrame;
+            if(prevFrame != nextFrame)
+            {
+                delete prevFrame;
+                prevFrame = nextFrame;
+            }
             if(!frameQueue.try_pop(nextFrame)) break;
             pts = nextFrame->timestamp;
         }

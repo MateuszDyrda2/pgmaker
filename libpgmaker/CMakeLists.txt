@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.16)
 
 set(libpgmaker_VERSION ${pgmaker_VERSION})
 
@@ -52,6 +52,7 @@ set(libpgmaker_SRC
 	src/clip.cpp
 	src/channel.cpp
 	src/timeline.cpp
+	src/video.cpp
 	src/preview.cpp
 )
 add_library(libpgmaker ${libpgmaker_SRC})

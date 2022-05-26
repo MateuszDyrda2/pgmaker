@@ -11,25 +11,14 @@ extern "C"
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace libpgmaker {
-struct resolution
-{
-    std::uint32_t width, height;
-};
-static bool operator==(const resolution& lhs, const resolution& rhs)
-{
-    return lhs.width == rhs.width && lhs.height == rhs.height;
-}
-static bool operator!=(const resolution& lhs, const resolution& rhs)
-{
-    return !(lhs == rhs);
-}
 struct frame
 {
-    resolution size;
-    std::unique_ptr<std::uint8_t[]> data;
+    std::pair<std::uint32_t, std::uint32_t> size;
+    std::vector<std::uint8_t> data;
     std::chrono::milliseconds timestamp;
 };
 struct audio_frame
