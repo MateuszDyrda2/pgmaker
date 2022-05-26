@@ -6,27 +6,40 @@ set(pgmaker_VERSION_MINOR 1)
 set(pgmaker_VERSION_PATCH 0)
 set(pgmaker_VERSION ${pgmaker_VERSION_MAJOR}.${pgmaker_VERSION_MINOR}.${pgmaker_VERSION_PATCH})
 
-project(pgmaker VERSION ${pgmaker_VERSION} LANGUAGES CXX)
+if(WIN32)
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+else()
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+endif()
 
-find_package(glfw3 REQUIRED)
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(lib/glfw)
 add_subdirectory(libpgmaker)
 add_subdirectory(lib/imgui)
 add_subdirectory(lib/nativefiledialog)
 
+project(pgmaker VERSION ${pgmaker_VERSION} LANGUAGES CXX)
+
+
 add_executable(pgmaker src/main.cpp)
 
-target_compile_definitions(pgmaker
-    PRIVATE $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:QT_QML_DEBUG>)
 target_link_libraries(pgmaker
+	PUBLIC glad
+	PUBLIC glfw ${GLFW_LIBRARIES}
+	PUBLIC nfd
 	PUBLIC libpgmaker
 	PUBLIC imgui
-	PUBLIC glfw
-	PUBLIC nfd)
+)
 
-target_include_directories(pgmaker PUBLIC src)
+target_include_directories(
+	pgmaker 
+	PUBLIC src
+)
