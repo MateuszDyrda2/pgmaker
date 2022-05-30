@@ -21,12 +21,12 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
+project(pgmaker VERSION ${pgmaker_VERSION} LANGUAGES CXX)
+
 add_subdirectory(lib/glfw)
 add_subdirectory(libpgmaker)
 add_subdirectory(lib/imgui)
 add_subdirectory(lib/nativefiledialog)
-
-project(pgmaker VERSION ${pgmaker_VERSION} LANGUAGES CXX)
 
 
 add_executable(pgmaker src/main.cpp)
