@@ -3,7 +3,9 @@
 #include "clip.h"
 #include "pg_types.h"
 //#include "spsc_queue.h"
-#include "tsqueue.h"
+//#include "tsqueue.h"
+#include <readerwritercircularbuffer.h>
+#include <readerwriterqueue.h>
 
 #include <portaudio.h>
 
@@ -21,23 +23,24 @@ class timeline;
 class channel
 {
   public:
-    template<class T, std::size_t S>
-    //using spsc_queue   = spsc_queue<T, S>;
-    using spsc_queue   = tsqueue<T, S>;
-    using worker_type  = std::thread;
-    using time_point   = std::chrono::high_resolution_clock::time_point;
-    using duration     = std::chrono::high_resolution_clock::duration;
-    using milliseconds = std::chrono::milliseconds;
+    // using spsc_queue   = spsc_queue<T, S>;
+    //  using spsc_queue   = tsqueue<T, S>;
+    using packet_queue_t = moodycamel::ReaderWriterQueue<packet*>;
+    using frame_queue_t  = moodycamel::BlockingReaderWriterCircularBuffer<frame*>;
+    using worker_type    = std::thread;
+    using time_point     = std::chrono::high_resolution_clock::time_point;
+    using duration       = std::chrono::high_resolution_clock::duration;
+    using milliseconds   = std::chrono::milliseconds;
 
-    static constexpr std::size_t nbChannels = 2;
-    static constexpr std::size_t nbFrames   = 1024;
-    static constexpr std::size_t sampleRate = 48000;
+    static constexpr std::size_t NB_CHANNELS = 2;
+    static constexpr std::size_t NB_FRAMES   = 1024;
+    static constexpr std::size_t SAMPLE_RATE = 48000;
+    static constexpr std::size_t MAX_PACKETS = 64;
 
   public:
     channel(const timeline& tl);
     ~channel();
 
-    frame* get_frame(const duration& timestamp);
     bool add_clip(const std::shared_ptr<video>& vid, const milliseconds& at);
     bool append_clip(const std::shared_ptr<video>& vid);
     clip* get_clip(std::size_t index);
@@ -46,24 +49,24 @@ class channel
     const clip* operator[](std::size_t index) const;
     std::list<std::unique_ptr<clip>>& get_clips();
     const std::list<std::unique_ptr<clip>>& get_clips() const;
+    milliseconds get_duration() const { return lenght; }
 
     void jump2(const milliseconds& ts);
+    frame* next_frame(const duration& timestamp);
 
-    milliseconds get_lenght() const { return lenght; }
     bool set_paused(bool value);
 
   private:
     std::list<std::unique_ptr<clip>> clips;
     std::list<std::unique_ptr<clip>>::iterator currentClip;
-    spsc_queue<packet*, 32> videoPacketQueue;
-    spsc_queue<packet*, 32> audioPacketQueue;
-    spsc_queue<frame*, 32> frameQueue;
+    packet_queue_t videoPacketQueue;
+    packet_queue_t audioPacketQueue;
+    frame_queue_t frameQueue;
     frame* prevFrame;
     frame* nextFrame;
     milliseconds lenght;
     worker_type decodeWorker;
     worker_type videoWorker;
-    // worker_type audioWorker;
     std::atomic_bool stopped;
     std::atomic_bool paused;
     std::vector<float> silentBuffer;
@@ -80,12 +83,9 @@ class channel
     void decoding_job();
     void video_job();
     void recalculate_lenght();
-    static int pa_stream_callback(
-        const void* input,
+    int audio_stream_callback(
         void* output,
         unsigned long frameCount,
-        const PaStreamCallbackTimeInfo* timeInfo,
-        PaStreamCallbackFlags statusFlags,
-        void* userData);
+        const PaStreamCallbackTimeInfo* timeInfo);
 };
 } // namespace libpgmaker

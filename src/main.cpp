@@ -228,7 +228,8 @@ void create_timeline(timeline& tl)
         ImGui::SetCursorPos(ImVec2(regSize - 20.f, 20.f));
         if(ImGui::Button(">", ImVec2(40.f, 40.f)))
         {
-            tl.set_paused(!tl.is_paused());
+            // tl.set_paused(!tl.is_paused());
+            tl.toggle_pause();
         }
         ImGui::SetCursorPos(ImVec2(regSize + 30.f, 20.f));
         if(ImGui::Button(">>", ImVec2(40.f, 40.f)))
@@ -258,12 +259,12 @@ void create_timeline(timeline& tl)
                 drawList->AddText(canvasPos, 0xFFFFFFFF, "Channel 1");
                 for(const auto& cl : ch->get_clips())
                 {
-                    auto starts   = cl->get_starts_at().count();
-                    auto ends     = cl->get_duration().count();
-                    auto stDiv    = starts / double(timemax);
-                    auto edDiv    = ends / double(timemax);
+                    auto starts    = cl->get_starts_at().count();
+                    auto ends      = cl->get_duration().count();
+                    auto stDiv     = starts / double(timemax);
+                    auto edDiv     = ends / double(timemax);
                     float clipXMin = xmin + stDiv * (xmax - xmin),
-                         clipXMax = xmin + edDiv * (xmax - xmin);
+                          clipXMax = xmin + edDiv * (xmax - xmin);
                     drawList->AddRectFilled(
                         { float(clipXMin), canvasPos.y },
                         { float(clipXMax), canvasPos.y + channelHeight },
@@ -280,7 +281,7 @@ void create_timeline(timeline& tl)
                     tl.jump2(std::chrono::milliseconds(std::int64_t(timePos)));
                 }
             }
-            const auto ts = tl.get_timestamp().count();
+            const auto ts  = tl.get_timestamp().count();
             float xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
             drawList->AddLine(
                 { float(xlinepos), canvasPos.y },
@@ -317,7 +318,7 @@ void create_playback(timeline& tl)
         auto size = ImGui::GetWindowSize();
 
         glBindTexture(GL_TEXTURE_2D, texture);
-        auto frame = tl.get_frame();
+        auto frame = tl.next_frame();
         if(frame)
         {
             if(frame->size != textureSize)

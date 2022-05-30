@@ -1,12 +1,13 @@
 #include <libpgmaker/timeline.h>
 
+#include <algorithm>
 #include <cassert>
 
 namespace libpgmaker {
 using namespace std;
+using namespace chrono_literals;
 timeline::timeline(const project_settings& settings):
-    paused(false), start(), pausedOffset(0),
-    startOffset(0), settings(settings), pauseStarted(),
+    paused(false), settings(settings),
     ts(0), tsChecked()
 {
     rebuild();
@@ -52,7 +53,7 @@ const channel* timeline::operator[](std::size_t index) const
 {
     return channels[index].get();
 }
-frame* timeline::get_frame()
+frame* timeline::next_frame()
 {
     if(channels.empty())
         return nullptr;
@@ -64,49 +65,41 @@ frame* timeline::get_frame()
             now - tsChecked);
         tsChecked = now;
     }
-    // const auto timestamp = get_timestamp();
 
     vector<frame*> frames;
     for(auto& ch : channels)
     {
-        frames.push_back(ch->get_frame(ts));
+        frames.push_back(ch->next_frame(ts));
     }
     return frames.front();
 }
 bool timeline::set_paused(bool value)
 {
-    using namespace chrono;
-    /*
-        if(paused == value) return value;
-
-        auto old = paused;
-        paused   = value;
-        if(value)
-        {
-            pauseStarted = high_resolution_clock::now();
-        }
-        else
-        {
-            pausedOffset += high_resolution_clock::now() - pauseStarted;
-        }
-        for(auto& ch : channels)
-        {
-            ch->set_paused(value);
-        }
-        return old;
-    */
     if(paused == value) return value;
 
     auto old = paused;
     paused   = value;
     if(!value)
     {
-        tsChecked = high_resolution_clock::now();
+        tsChecked = chrono::high_resolution_clock::now();
     }
     for(auto& ch : channels)
     {
         ch->set_paused(value);
     }
+    return old;
+}
+
+bool timeline::toggle_pause()
+{
+    auto old = paused;
+
+    paused ^= 1;
+    for_each(channels.begin(), channels.end(),
+             [&](auto& ch) { ch->set_paused(paused); });
+
+    if(paused == false) tsChecked = chrono::high_resolution_clock::now();
+
     return old;
 }
 void timeline::initialize_audio()
@@ -129,39 +122,36 @@ void timeline::drop_audio()
 void timeline::rebuild()
 {
     using namespace chrono;
-    start        = high_resolution_clock::now();
-    pausedOffset = duration(0);
-    ts           = milliseconds(0);
-    tsChecked    = high_resolution_clock::now();
+    ts        = 0ms;
+    tsChecked = high_resolution_clock::now();
 }
 void timeline::jump2(const milliseconds& ts)
 {
     using namespace chrono;
-    // auto old    = set_paused(true);
-    // startOffset  = ts;
-    // pausedOffset = duration(0);
-    // rebuild();
-    /*start = */ tsChecked = high_resolution_clock::now();
-    this->ts               = ts;
+    auto realTs = max(milliseconds(0), min(ts, get_duration()));
+
+    this->ts = realTs;
     for(auto& ch : channels)
     {
-        ch->jump2(ts);
+        ch->jump2(realTs);
     }
+    tsChecked = high_resolution_clock::now();
+}
+
+timeline::milliseconds timeline::get_duration() const
+{
+    if(channels.empty()) return 0ms;
+
+    auto max = max_element(
+        channels.begin(), channels.end(),
+        [](const auto& lhs, const auto& rhs) {
+            return lhs->get_duration() < rhs->get_duration();
+        });
+    return (*max)->get_duration();
 }
 timeline::milliseconds timeline::get_timestamp() const
 {
     using namespace chrono;
-    /*
-        if(paused)
-        {
-            return duration_cast<milliseconds>(
-                pauseStarted - start - pausedOffset + startOffset);
-        }
-
-        return duration_cast<milliseconds>(
-            high_resolution_clock::now() - start - pausedOffset + startOffset);
-            */
-
     if(paused)
         return ts;
     else

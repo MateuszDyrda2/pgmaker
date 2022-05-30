@@ -41,19 +41,17 @@ class timeline
      * @param delta time in milliseconds since last time this function was called
      * @return pointer to the requested frame
      */
-    frame* get_frame();
+    frame* next_frame();
     bool set_paused(bool value);
-    bool is_paused() { return paused; }
+    bool toggle_pause();
     void jump2(const milliseconds& ts);
 
     milliseconds get_timestamp() const;
+    milliseconds get_duration() const;
+    bool get_paused() const { return paused; }
 
   private:
     bool paused;
-    time_point start;
-    time_point pauseStarted;
-    duration pausedOffset;
-    duration startOffset;
     project_settings settings;
     std::deque<std::unique_ptr<channel>> channels;
 
