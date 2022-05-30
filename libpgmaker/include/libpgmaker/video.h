@@ -22,18 +22,20 @@ struct video_info
 class video
 {
   public:
-    video() = default;
-    video(const std::string& path, const video_info& info, thumbnail&& tn):
-        path(path), information(info), tn(std::move(tn)) { }
+    video();
+    video(const std::string& path, const video_info& info, thumbnail&& tn);
+    ~video();
 
     const video_info& get_info() const { return information; }
     const thumbnail& get_thumbnail() { return tn; }
     const std::string& get_path() const { return path; }
+    unsigned int get_texture() const;
 
   private:
     std::string path;
     video_info information;
     thumbnail tn;
+    unsigned int texture;
 
     friend class video_reader;
     friend class channel;

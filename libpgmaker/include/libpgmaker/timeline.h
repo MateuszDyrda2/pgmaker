@@ -30,26 +30,33 @@ class timeline
     void remove_channel(std::size_t index);
     /** @return Returns a channel with index specified */
     channel* get_channel(std::size_t index);
+    channel* operator[](std::size_t index);
+    const channel* get_channel(std::size_t index) const;
+    const channel* operator[](std::size_t index) const;
+    const std::deque<std::unique_ptr<channel>>& get_channels() const;
+    std::deque<std::unique_ptr<channel>>& get_channels();
     /** @brief Move playback by specified delta.
      * Depending on the delta sometimes the returned frame will be
      * the same frame as the last one or some frames may be skipped
      * @param delta time in milliseconds since last time this function was called
      * @return pointer to the requested frame
      */
-    frame* get_frame();
+    frame* next_frame();
     bool set_paused(bool value);
+    bool toggle_pause();
     void jump2(const milliseconds& ts);
 
     milliseconds get_timestamp() const;
+    milliseconds get_duration() const;
+    bool get_paused() const { return paused; }
 
   private:
     bool paused;
-    time_point start;
-    time_point pauseStarted;
-    duration pausedOffset;
-    duration startOffset;
     project_settings settings;
     std::deque<std::unique_ptr<channel>> channels;
+
+    milliseconds ts;
+    time_point tsChecked;
 
   private:
     void initialize_audio();

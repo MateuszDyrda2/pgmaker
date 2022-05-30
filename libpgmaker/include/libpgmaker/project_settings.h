@@ -5,7 +5,7 @@
 namespace libpgmaker {
 struct project_settings
 {
-    resolution size;
+    std::pair<std::uint32_t, std::uint32_t> size;
     std::size_t framerate;
 };
 
