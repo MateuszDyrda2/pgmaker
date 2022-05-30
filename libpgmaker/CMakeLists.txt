@@ -144,12 +144,21 @@ if(libpgmaker_BUILDSANDBOX)
 endif()
 
 if(WIN32)
+
+#	add_custom_command(TARGET libpgmaker POST_BUILD
+#		COMMAND ${CMAKE_COMMAND} -E 
+#			copy ${FFMPEG_DIRECTORY}/bin/avcodec-59.dll 
+#			${FFMPEG_DIRECTORY}/bin/avformat-59.dll
+#			${FFMPEG_DIRECTORY}/bin/avutil-57.dll
+#			${FFMPEG_DIRECTORY}/bin/swresample-4.dll 
+#			${FFMPEG_DIRECTORY}/bin/swscale-6.dll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+#	)
+	file(GLOB FFMPEG_DDLS
+	"${FFMPEG_DIRECTORY}/bin/*.dll"
+	)
 	add_custom_command(TARGET libpgmaker POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E 
-			copy ${FFMPEG_DIRECTORY}/bin/avcodec-59.dll 
-			${FFMPEG_DIRECTORY}/bin/avformat-59.dll
-			${FFMPEG_DIRECTORY}/bin/avutil-57.dll
-			${FFMPEG_DIRECTORY}/bin/swresample-4.dll 
-			${FFMPEG_DIRECTORY}/bin/swscale-6.dll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+			copy ${FFMPEG_DDLS}
+			${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
 	)
 endif()

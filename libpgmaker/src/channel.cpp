@@ -25,9 +25,12 @@ channel::~channel()
 {
     drop_audio();
     stopped = true;
-    videoPacketQueue.notify();
-    audioPacketQueue.notify();
-    frameQueue.notify();
+    // videoPacketQueue.notify();
+    // audioPacketQueue.notify();
+    // frameQueue.notify();
+    videoPacketQueue.stop();
+    audioPacketQueue.stop();
+    frameQueue.stop();
     if(decodeWorker.joinable()) decodeWorker.join();
     if(videoWorker.joinable()) videoWorker.join();
     // if(audioWorker.joinable()) audioWorker.join();
@@ -75,10 +78,10 @@ const std::list<std::unique_ptr<clip>>& channel::get_clips() const
 }
 frame* channel::get_frame(const duration& timestamp)
 {
-    if(paused)
-    {
-        return nextFrame;
-    }
+    // if(paused)
+    // {
+    //     return nextFrame;
+    // }
     if(timestamp >= lenght)
     {
         return nullptr;
@@ -114,9 +117,12 @@ bool channel::set_paused(bool value)
 void channel::stop()
 {
     stopped = true;
-    videoPacketQueue.notify();
-    audioPacketQueue.notify();
-    frameQueue.notify();
+    // videoPacketQueue.notify();
+    // audioPacketQueue.notify();
+    // frameQueue.notify();
+    videoPacketQueue.stop();
+    audioPacketQueue.stop();
+    frameQueue.stop();
 
     if(decodeWorker.joinable()) decodeWorker.join();
     if(videoWorker.joinable()) videoWorker.join();
@@ -152,8 +158,6 @@ void channel::jump2(const chrono::milliseconds& ts)
     {
         throw runtime_error("Failed to jump to requested timestamp");
     }
-    seek.store(true, memory_order_relaxed);
-    seekPts = cl->video_reconvert_pts(ts);
 
     start();
 }
@@ -169,18 +173,15 @@ void channel::decoding_job()
             {
                 if(pPacket->stream_index == c->vsIndex)
                 {
-                    if(seek)
-                    {
-                        printf("%lld - %lld\n", pPacket->pts, seekPts);
-                        seek = false;
-                    }
                     auto p = new packet{ c.get(), pPacket };
-                    videoPacketQueue.push(p, [this] { return stopped == true; });
+                    // videoPacketQueue.push(p, [this] { return stopped == true; });
+                    videoPacketQueue.push(p);
                 }
                 else if(pPacket->stream_index == c->asIndex)
                 {
                     auto p = new packet{ c.get(), pPacket };
-                    audioPacketQueue.push(p, [this] { return stopped == true; });
+                    // audioPacketQueue.push(p, [this] { return stopped == true; });
+                    audioPacketQueue.push(p);
                 }
                 else
                 {
@@ -206,7 +207,8 @@ void channel::video_job()
     while(!stopped)
     {
         packet* p = nullptr;
-        videoPacketQueue.pop(p, [this] { return stopped == true; });
+        // videoPacketQueue.pop(p, [this] { return stopped == true; });
+        videoPacketQueue.pop(p);
         if(!p) break;
 
         auto c = p->owner;
@@ -214,7 +216,8 @@ void channel::video_job()
         {
             auto fr = new frame;
             c->convert_frame(pFrame, &fr);
-            frameQueue.push(fr, [this] { return stopped == true; });
+            // frameQueue.push(fr, [this] { return stopped == true; });
+            frameQueue.push(fr);
         }
         av_packet_unref(p->payload);
         av_packet_free(&p->payload);

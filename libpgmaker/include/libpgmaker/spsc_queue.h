@@ -114,27 +114,31 @@ template<class T, std::size_t N>
 template<class F>
 void spsc_queue<T, N>::pop(T& obj, F cond)
 {
-    std::unique_lock lck(mtx);
-    while(buffer.empty() && !cond())
     {
-        emptyCvar.wait(lck);
+        std::unique_lock lck(mtx);
+        while(buffer.empty() && !cond())
+        {
+            emptyCvar.wait(lck);
+        }
+        if(buffer.empty()) return;
+        obj = std::move(buffer.front());
+        buffer.pop();
     }
-    if(buffer.empty()) return;
-    obj = std::move(buffer.front());
-    buffer.pop();
     fullCvar.notify_one();
 }
 template<class T, std::size_t N>
 template<class F>
 void spsc_queue<T, N>::push(const T& obj, F cond)
 {
-    std::unique_lock lck(mtx);
-    while(buffer.size() >= N - 1 && !cond())
     {
-        fullCvar.wait(lck);
+        std::unique_lock lck(mtx);
+        while(buffer.size() >= N - 1 && !cond())
+        {
+            fullCvar.wait(lck);
+        }
+        if(buffer.size() >= N - 1) return;
+        buffer.push(obj);
     }
-    if(buffer.size() >= N - 1) return;
-    buffer.push(obj);
     emptyCvar.notify_one();
 }
 template<class T, std::size_t N>

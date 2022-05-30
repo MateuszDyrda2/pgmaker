@@ -2,7 +2,8 @@
 
 #include "clip.h"
 #include "pg_types.h"
-#include "spsc_queue.h"
+//#include "spsc_queue.h"
+#include "tsqueue.h"
 
 #include <portaudio.h>
 
@@ -21,7 +22,8 @@ class channel
 {
   public:
     template<class T, std::size_t S>
-    using spsc_queue   = spsc_queue<T, S>;
+    //using spsc_queue   = spsc_queue<T, S>;
+    using spsc_queue   = tsqueue<T, S>;
     using worker_type  = std::thread;
     using time_point   = std::chrono::high_resolution_clock::time_point;
     using duration     = std::chrono::high_resolution_clock::duration;
@@ -69,9 +71,6 @@ class channel
     PaStream* audioStream;
 
     const timeline& tl;
-
-    std::atomic_bool seek;
-    std::int64_t seekPts;
 
   private:
     void stop();

@@ -6,7 +6,8 @@ namespace libpgmaker {
 using namespace std;
 timeline::timeline(const project_settings& settings):
     paused(false), start(), pausedOffset(0),
-    startOffset(0), settings(settings), pauseStarted()
+    startOffset(0), settings(settings), pauseStarted(),
+    ts(0), tsChecked()
 {
     rebuild();
     set_paused(true);
@@ -56,29 +57,51 @@ frame* timeline::get_frame()
     if(channels.empty())
         return nullptr;
 
-    const auto timestamp = get_timestamp();
+    if(!paused)
+    {
+        auto now = chrono::high_resolution_clock::now();
+        ts += chrono::duration_cast<milliseconds>(
+            now - tsChecked);
+        tsChecked = now;
+    }
+    // const auto timestamp = get_timestamp();
 
     vector<frame*> frames;
     for(auto& ch : channels)
     {
-        frames.push_back(ch->get_frame(timestamp));
+        frames.push_back(ch->get_frame(ts));
     }
     return frames.front();
 }
 bool timeline::set_paused(bool value)
 {
     using namespace chrono;
+    /*
+        if(paused == value) return value;
+
+        auto old = paused;
+        paused   = value;
+        if(value)
+        {
+            pauseStarted = high_resolution_clock::now();
+        }
+        else
+        {
+            pausedOffset += high_resolution_clock::now() - pauseStarted;
+        }
+        for(auto& ch : channels)
+        {
+            ch->set_paused(value);
+        }
+        return old;
+    */
     if(paused == value) return value;
 
     auto old = paused;
     paused   = value;
-    if(value)
+    if(!value)
     {
-        pauseStarted = high_resolution_clock::now();
-    }
-    else
-    {
-        pausedOffset += high_resolution_clock::now() - pauseStarted;
+        tsChecked = high_resolution_clock::now();
     }
     for(auto& ch : channels)
     {
@@ -108,15 +131,18 @@ void timeline::rebuild()
     using namespace chrono;
     start        = high_resolution_clock::now();
     pausedOffset = duration(0);
+    ts           = milliseconds(0);
+    tsChecked    = high_resolution_clock::now();
 }
 void timeline::jump2(const milliseconds& ts)
 {
     using namespace chrono;
     // auto old    = set_paused(true);
-    startOffset  = ts;
-    pausedOffset = duration(0);
+    // startOffset  = ts;
+    // pausedOffset = duration(0);
     // rebuild();
-    start = pauseStarted = high_resolution_clock::now();
+    /*start = */ tsChecked = high_resolution_clock::now();
+    this->ts               = ts;
     for(auto& ch : channels)
     {
         ch->jump2(ts);
@@ -125,14 +151,20 @@ void timeline::jump2(const milliseconds& ts)
 timeline::milliseconds timeline::get_timestamp() const
 {
     using namespace chrono;
+    /*
+        if(paused)
+        {
+            return duration_cast<milliseconds>(
+                pauseStarted - start - pausedOffset + startOffset);
+        }
+
+        return duration_cast<milliseconds>(
+            high_resolution_clock::now() - start - pausedOffset + startOffset);
+            */
 
     if(paused)
-    {
-        return duration_cast<milliseconds>(
-            pauseStarted - start - pausedOffset + startOffset);
-    }
-
-    return duration_cast<milliseconds>(
-        high_resolution_clock::now() - start - pausedOffset + startOffset);
+        return ts;
+    else
+        return ts + duration_cast<milliseconds>(high_resolution_clock::now() - tsChecked);
 }
 } // namespace libpgmaker

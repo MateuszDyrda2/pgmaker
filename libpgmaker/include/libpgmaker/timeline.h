@@ -57,6 +57,9 @@ class timeline
     project_settings settings;
     std::deque<std::unique_ptr<channel>> channels;
 
+    milliseconds ts;
+    time_point tsChecked;
+
   private:
     void initialize_audio();
     void drop_audio();

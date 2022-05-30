@@ -197,7 +197,7 @@ void create_videos(std::vector<std::shared_ptr<video>>& videos)
                 ImGui::SameLine(0.f);
             }
             if(ImGui::ImageButton(reinterpret_cast<ImTextureID>(videos[i]->get_texture()),
-                                  ImVec2(60, 60)))
+                                  ImVec2(60.f, 60.f)))
             {
             }
             if(ImGui::BeginDragDropSource())
@@ -265,8 +265,8 @@ void create_timeline(timeline& tl)
                     float clipXMin = xmin + stDiv * (xmax - xmin),
                          clipXMax = xmin + edDiv * (xmax - xmin);
                     drawList->AddRectFilled(
-                        { clipXMin, canvasPos.y },
-                        { clipXMax, canvasPos.y + channelHeight },
+                        { float(clipXMin), canvasPos.y },
+                        { float(clipXMax), canvasPos.y + channelHeight },
                         0xFF0000AA, 0);
                 }
                 ++index;
@@ -283,8 +283,8 @@ void create_timeline(timeline& tl)
             const auto ts = tl.get_timestamp().count();
             float xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
             drawList->AddLine(
-                { xlinepos, canvasPos.y },
-                { xlinepos, canvasPos.y + canvasSize.y },
+                { float(xlinepos), canvasPos.y },
+                { float(xlinepos), canvasPos.y + canvasSize.y },
                 0xFFFF0000,
                 3.f);
         }
