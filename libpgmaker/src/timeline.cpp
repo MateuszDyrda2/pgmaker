@@ -27,6 +27,16 @@ void timeline::remove_channel(std::size_t index)
     assert(index < channels.size());
     channels.erase(channels.begin() + index);
 }
+void timeline::remove_channel(channel* ch)
+{
+    assert(ch != nullptr);
+    auto toEr = find_if(channels.begin(), channels.end(),
+                        [&](auto& item) { return item.get() == ch; });
+    if(toEr == channels.end())
+        return;
+
+    channels.erase(toEr);
+}
 channel* timeline::get_channel(std::size_t index)
 {
     assert(index < channels.size());

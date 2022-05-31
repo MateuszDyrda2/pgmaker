@@ -114,6 +114,7 @@ set(libpgmaker_SRC
 	src/timeline.cpp
 	src/video.cpp
 	src/preview.cpp
+	src/pg_types.cpp
 )
 add_library(libpgmaker STATIC ${libpgmaker_SRC})
 
@@ -153,15 +154,6 @@ if(libpgmaker_BUILDSANDBOX)
 endif()
 
 if(WIN32)
-
-#	add_custom_command(TARGET libpgmaker POST_BUILD
-#		COMMAND ${CMAKE_COMMAND} -E 
-#			copy ${FFMPEG_DIRECTORY}/bin/avcodec-59.dll 
-#			${FFMPEG_DIRECTORY}/bin/avformat-59.dll
-#			${FFMPEG_DIRECTORY}/bin/avutil-57.dll
-#			${FFMPEG_DIRECTORY}/bin/swresample-4.dll 
-#			${FFMPEG_DIRECTORY}/bin/swscale-6.dll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-#	)
 	file(GLOB FFMPEG_DDLS
 	"${FFMPEG_DIRECTORY}/bin/*.dll"
 	)

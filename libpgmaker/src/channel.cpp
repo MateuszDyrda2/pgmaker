@@ -151,6 +151,7 @@ void channel::decoding_job()
     static constexpr size_t MAX_NOOP                = 8;
     static constexpr chrono::milliseconds SLEEP_DUR = 10ms;
     size_t nbNoop                                   = 0ULL;
+
     while(!stopped)
     {
         if(currentClip != clips.end())
@@ -160,8 +161,7 @@ void channel::decoding_job()
                 nbNoop = 0;
                 this_thread::sleep_for(SLEEP_DUR);
             }
-            auto& c      = *currentClip;
-            auto pPacket = av_packet_alloc();
+            auto& c = *currentClip;
 
             if(videoPacketQueue.size_approx() >= MAX_PACKETS
                && audioPacketQueue.size_approx() >= MAX_PACKETS)
@@ -169,21 +169,20 @@ void channel::decoding_job()
                 ++nbNoop;
                 continue;
             }
-            if(c->get_packet(&pPacket))
+            packet _packet;
+            if(c->get_packet(_packet))
             {
-                if(pPacket->stream_index == c->vsIndex)
+                if(_packet.payload->stream_index == c->vsIndex)
                 {
-                    auto p = new packet{ c.get(), pPacket };
-                    videoPacketQueue.enqueue(p);
+                    videoPacketQueue.enqueue(std::move(_packet));
                 }
-                else if(pPacket->stream_index == c->asIndex)
+                else if(_packet.payload->stream_index == c->asIndex)
                 {
-                    auto p = new packet{ c.get(), pPacket };
-                    audioPacketQueue.enqueue(p);
+                    audioPacketQueue.enqueue(std::move(_packet));
                 }
                 else
                 {
-                    av_packet_unref(pPacket);
+                    _packet.unref();
                 }
             }
             else
@@ -213,24 +212,22 @@ void channel::video_job()
             nbNoop = 0;
             this_thread::sleep_for(SLEEP_DUR);
         }
-        packet* p = nullptr;
-        if(!videoPacketQueue.try_dequeue(p))
+        // packet* p = nullptr;
+        packet _packet;
+        if(!videoPacketQueue.try_dequeue(_packet))
         {
             ++nbNoop;
             continue;
         }
         nbNoop = 0;
-        auto c = p->owner;
-        if(c->get_frame(p->payload, &pFrame))
+        auto c = _packet.owner;
+        if(c->get_frame(_packet, &pFrame))
         {
             auto fr = new frame;
             c->convert_frame(pFrame, &fr);
-            // frameQueue.wait_enqueue(fr);
             while(!stopped && !frameQueue.wait_enqueue_timed(fr, 10ms))
                 ;
         }
-        av_packet_unref(p->payload);
-        av_packet_free(&p->payload);
     }
     av_frame_free(&pFrame);
 }
@@ -318,8 +315,7 @@ int channel::audio_stream_callback(
         return 0;
     }
 
-    packet* p = nullptr;
-    auto ptr  = audioBuffer.data();
+    auto ptr = audioBuffer.data();
     while(sampleCount > 0)
     {
         auto pptr = audioPacketQueue.peek();
@@ -328,10 +324,9 @@ int channel::audio_stream_callback(
             std::copy_n(silentBuffer.begin(), sampleCount * NB_CHANNELS, out);
             break;
         }
-        p               = *pptr;
         auto tlTs       = tl.get_timestamp();
-        auto* c         = p->owner;
-        auto newPts     = c->audio_convert_pts(p->payload->pts);
+        auto* c         = pptr->owner;
+        auto newPts     = c->audio_convert_pts(pptr->payload->pts);
         const auto diff = newPts - tlTs;
         if(diff > NoSyncThreshold)
         {
@@ -340,14 +335,15 @@ int channel::audio_stream_callback(
             return 0;
         }
 
-        audioPacketQueue.pop();
         if(diff < minusNoSyncThreshold)
         {
+            audioPacketQueue.pop();
             continue;
         }
-        auto bSize = c->get_audio_frame(p, audioBuffer);
+        auto bSize = c->get_audio_frame(pptr, audioBuffer);
         std::copy_n(audioBuffer.begin(), bSize * NB_CHANNELS, out);
         sampleCount -= bSize;
+        audioPacketQueue.pop();
     }
     return 0;
 }

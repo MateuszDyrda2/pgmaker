@@ -33,8 +33,8 @@ class clip
     void change_start_offset(const milliseconds& startOffset);
     void change_end_offset(const milliseconds& endOffset);
     void reset();
-    bool get_packet(AVPacket** pPacket);
-    bool get_frame(AVPacket* pPacket, AVFrame** frame);
+    bool get_packet(packet& pPacket);
+    bool get_frame(packet& pPacket, AVFrame** frame);
     std::size_t get_audio_frame(packet* pPacket, std::vector<float>& b);
     void convert_frame(AVFrame* iFrame, frame** oFrame);
     milliseconds audio_convert_pts(std::int64_t pts) const;

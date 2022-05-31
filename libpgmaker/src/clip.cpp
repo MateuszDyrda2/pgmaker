@@ -132,22 +132,24 @@ void clip::reset()
 {
     seek_start();
 }
-bool clip::get_packet(AVPacket** pPacket)
+bool clip::get_packet(packet& pPacket)
 {
-    if(av_read_frame(pFormatCtx, *pPacket) < 0)
+    AVPacket* p = av_packet_alloc();
+    if(av_read_frame(pFormatCtx, p) < 0)
         return false;
 
-    const auto time      = (*pPacket)->pts * vidTimebase.num / (double)vidTimebase.den;
+    const auto time      = p->pts * vidTimebase.num / (double)vidTimebase.den;
     const auto millitime = chrono::duration<double>(time);
     const auto endtime   = vid->get_info().duration - endOffset;
-    vidCurrentStreamPos  = (*pPacket)->pos;
-    vidCurrentTs         = (*pPacket)->pts;
-
+    vidCurrentStreamPos  = p->pos;
+    vidCurrentTs         = p->pts;
+    pPacket.owner        = this;
+    pPacket.payload      = p;
     return (millitime < endtime);
 }
-bool clip::get_frame(AVPacket* pPacket, AVFrame** frame)
+bool clip::get_frame(packet& pPacket, AVFrame** frame)
 {
-    if(avcodec_send_packet(pVideoCodecCtx, pPacket) < 0)
+    if(avcodec_send_packet(pVideoCodecCtx, pPacket.payload) < 0)
     {
         throw runtime_error("Failed to decode a packet");
     }

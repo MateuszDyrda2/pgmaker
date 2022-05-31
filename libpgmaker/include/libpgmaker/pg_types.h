@@ -28,7 +28,16 @@ struct audio_frame
 };
 struct packet
 {
-    class clip* owner;
-    AVPacket* payload;
+    class clip* owner = nullptr;
+    AVPacket* payload = nullptr;
+
+    packet() = default;
+    packet(class clip* owner, AVPacket* payload);
+    ~packet();
+    packet(const packet& other) = delete;
+    packet(packet&& other) noexcept;
+    packet& operator=(packet&& other) noexcept;
+    void free();
+    void unref();
 };
 } // namespace libpgmaker

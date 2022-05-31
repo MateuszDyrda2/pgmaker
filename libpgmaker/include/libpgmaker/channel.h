@@ -25,7 +25,7 @@ class channel
   public:
     // using spsc_queue   = spsc_queue<T, S>;
     //  using spsc_queue   = tsqueue<T, S>;
-    using packet_queue_t = moodycamel::ReaderWriterQueue<packet*>;
+    using packet_queue_t = moodycamel::ReaderWriterQueue<packet>;
     using frame_queue_t  = moodycamel::BlockingReaderWriterCircularBuffer<frame*>;
     using worker_type    = std::thread;
     using time_point     = std::chrono::high_resolution_clock::time_point;
