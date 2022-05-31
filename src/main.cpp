@@ -3,14 +3,12 @@
 
 #include <glad/glad.h>
 
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-#include <imgui_impl_opengl3_loader.h>
-#include <imgui_internal.h>
-
-#include <libpgmaker/timeline.h>
-#include <libpgmaker/video_reader.h>
+#include "cmain_menu.h"
+#include "cnode_editor.h"
+#include "cplayback.h"
+#include "cproperties.h"
+#include "ctimeline.h"
+#include "cvideos.h"
 
 #include <nfd.h>
 
@@ -19,8 +17,12 @@
 #include <vector>
 
 using namespace libpgmaker;
-static void create_main_menu(std::vector<std::shared_ptr<video>>& videos, video_reader& reader);
-static void create_main_dockspace(timeline& tl, std::vector<std::shared_ptr<video>>& videos);
+static void create_main_menu(std::vector<std::shared_ptr<video>>& videos);
+static void create_main_dockspace(cvideos& videoWindow,
+                                  cproperties& propertyWindow,
+                                  ctimeline& timelineWindow,
+                                  cplayback& playbackWindow,
+                                  cnode_editor& nodeEditorWindow);
 static void initialize_layout(ImGuiID dockspaceId);
 static void create_videos(std::vector<std::shared_ptr<video>>& videos);
 static void create_properties();
@@ -31,6 +33,7 @@ static void create_node_editor();
 static std::pair<int, int> windowSize{ 1920, 1080 };
 static std::pair<std::uint32_t, std::uint32_t> textureSize{ 1080, 720 };
 static unsigned int texture;
+static video* selectedVideo = nullptr;
 
 int main()
 {
@@ -77,22 +80,25 @@ int main()
     NFD_Init();
 
     timeline tl(project_settings{});
-    video_reader reader;
-    // auto vid = reader.load_file("/home/matzix/shared/PGMaker/libpgmaker/data/1232.mp4");
     auto ch = tl.add_channel();
-    // ch->add_clip(vid, std::chrono::milliseconds(0));
     /////////////////////texture///////////
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                 textureSize.first, textureSize.second, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    // glGenTextures(1, &texture);
+    // glBindTexture(GL_TEXTURE_2D, texture);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+    //              textureSize.first, textureSize.second, 0,
+    //              GL_RGBA, GL_UNSIGNED_BYTE, 0);
     ////////////////////////////////////////
     std::vector<std::shared_ptr<video>> videos;
+    cmain_menu menu(videos);
+    cvideos videoWindow(videos);
+    cproperties propertyWindow;
+    ctimeline timelineWindow(tl);
+    cplayback playbackWindow(tl);
+    cnode_editor nodeEditorWindow;
 
     while(!glfwWindowShouldClose(window))
     {
@@ -102,9 +108,10 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ////
-        create_main_menu(videos, reader);
+        // create_main_menu(videos);
+        menu.draw();
         ////
-        create_main_dockspace(tl, videos);
+        create_main_dockspace(videoWindow, propertyWindow, timelineWindow, playbackWindow, nodeEditorWindow);
         ////
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -120,7 +127,7 @@ int main()
     glfwDestroyWindow(window);
     return 0;
 }
-void create_main_menu(std::vector<std::shared_ptr<video>>& videos, video_reader& reader)
+void create_main_menu(std::vector<std::shared_ptr<video>>& videos)
 {
     if(ImGui::BeginMainMenuBar())
     {
@@ -133,7 +140,12 @@ void create_main_menu(std::vector<std::shared_ptr<video>>& videos, video_reader&
                 if(result == NFD_OKAY)
                 {
                     printf("%s\n", outPath);
-                    videos.push_back(reader.load_file(outPath));
+                    auto vid = video_reader::load_file(outPath)
+                                   .load_metadata()
+                                   .load_thumbnail()
+                                   .get();
+
+                    videos.push_back(std::move(vid));
                     NFD_FreePath(outPath);
                 }
             };
@@ -146,7 +158,11 @@ void create_main_menu(std::vector<std::shared_ptr<video>>& videos, video_reader&
         ImGui::EndMainMenuBar();
     }
 }
-void create_main_dockspace(timeline& tl, std::vector<std::shared_ptr<video>>& videos)
+void create_main_dockspace(cvideos& videoWindow,
+                           cproperties& propertyWindow,
+                           ctimeline& timelineWindow,
+                           cplayback& playbackWindow,
+                           cnode_editor& nodeEditorWindow)
 {
     ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
     ImGuiWindowFlags windowFlags      = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
@@ -177,11 +193,17 @@ void create_main_dockspace(timeline& tl, std::vector<std::shared_ptr<video>>& vi
         else
         {
             ImGui::DockSpace(dockspaceId, ImVec2(0, 0), dockspaceFlags);
-            create_timeline(tl);
-            create_videos(videos);
-            create_properties();
-            create_node_editor();
-            create_playback(tl);
+
+            timelineWindow.draw();
+            videoWindow.draw();
+            propertyWindow.draw();
+            nodeEditorWindow.draw();
+            playbackWindow.draw();
+            // create_timeline(tl);
+            // create_videos(videos);
+            // create_properties();
+            // create_node_editor();
+            // create_playback(tl);
         }
     }
     ImGui::End();
@@ -197,12 +219,15 @@ void create_videos(std::vector<std::shared_ptr<video>>& videos)
                 ImGui::SameLine(0.f);
             }
             if(ImGui::ImageButton(reinterpret_cast<ImTextureID>(videos[i]->get_texture()),
-                                  ImVec2(60.f, 60.f)))
+                                  ImVec2(106.f, 60.f)))
             {
+                selectedVideo = videos[i].get();
             }
             if(ImGui::BeginDragDropSource())
             {
                 ImGui::SetDragDropPayload("demo", &videos[i], sizeof(&videos[i]));
+                ImGui::ImageButton(reinterpret_cast<ImTextureID>(videos[i]->get_texture()),
+                                   ImVec2(106.f, 60.f));
                 ImGui::EndDragDropSource();
             }
         }
@@ -212,7 +237,14 @@ void create_videos(std::vector<std::shared_ptr<video>>& videos)
 void create_properties()
 {
     ImGui::Begin("Properties");
-    ImGui::Text("hello from properties");
+    if(selectedVideo)
+    {
+        const auto& info = selectedVideo->get_info();
+        ImGui::Text("File path: %s", info.path.c_str());
+        ImGui::Text("Duration: %ld", info.duration.count() / 1000.0);
+        ImGui::Text("Width: %lu", info.width);
+        ImGui::Text("Height: %lu", info.height);
+    }
     ImGui::End();
 }
 void create_timeline(timeline& tl)
@@ -236,6 +268,7 @@ void create_timeline(timeline& tl)
         {
             tl.jump2(tl.get_timestamp() + std::chrono::milliseconds(3000));
         }
+        ImGui::BeginChild("TimelineContent", ImGui::GetContentRegionAvail());
         {
             auto& io                        = ImGui::GetIO();
             auto drawList                   = ImGui::GetWindowDrawList();
@@ -245,34 +278,13 @@ void create_timeline(timeline& tl)
             float xmin                      = canvasPos.x + textWidth;
             float xmax                      = canvasPos.x + canvasSize.x;
             float channelHeight = 60, channelMargin = 10;
-
-            std::size_t index  = 0;
             const auto timemax = 20000;
-            for(const auto& ch : tl.get_channels())
-            {
-                ImGui::InvisibleButton("canvas", ImVec2(canvasSize.x - canvasPos.x, channelHeight));
-                float spacing = index * (channelHeight + channelMargin);
-                drawList->AddRectFilled(
-                    { xmin, canvasPos.y },
-                    { xmax, canvasPos.y + channelHeight },
-                    0xFF3D3837, 0);
-                drawList->AddText(canvasPos, 0xFFFFFFFF, "Channel 1");
-                for(const auto& cl : ch->get_clips())
-                {
-                    auto starts    = cl->get_starts_at().count();
-                    auto ends      = cl->get_duration().count();
-                    auto stDiv     = starts / double(timemax);
-                    auto edDiv     = ends / double(timemax);
-                    float clipXMin = xmin + stDiv * (xmax - xmin),
-                          clipXMax = xmin + edDiv * (xmax - xmin);
-                    drawList->AddRectFilled(
-                        { float(clipXMin), canvasPos.y },
-                        { float(clipXMax), canvasPos.y + channelHeight },
-                        0xFF0000AA, 0);
-                }
-                ++index;
-            }
-            if(ImGui::IsItemActive())
+
+            /////////////////////////////////////////////
+            // DRAW LINE
+            /////////////////////////////////////////////
+            // if(ImGui::IsItemActive())
+            if(ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
                 auto mousePos = io.MouseClickedPos[0];
                 if(mousePos.x >= xmin && mousePos.x <= xmax)
@@ -283,22 +295,76 @@ void create_timeline(timeline& tl)
             }
             const auto ts  = tl.get_timestamp().count();
             float xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
+
+            /////////////////////////////////////////////
+
+            std::size_t index = 0;
+            for(const auto& ch : tl.get_channels())
+            {
+                ImGui::PushID(index);
+                ImGui::InvisibleButton("", ImVec2(canvasSize.x - canvasPos.x, channelHeight));
+                float spacing = index * (channelHeight + channelMargin);
+                drawList->AddText(canvasPos, 0xFFFFFFFF, "Channel 1");
+                drawList->AddRectFilled(
+                    { xmin, canvasPos.y },
+                    { xmax, canvasPos.y + channelHeight },
+                    0xFF3D3837, 0);
+                if(ImGui::BeginDragDropTarget())
+                {
+                    if(const auto payload = ImGui::AcceptDragDropPayload("demo"))
+                    {
+                        tl.get_channel(0)->append_clip(
+                            *static_cast<std::shared_ptr<video>*>(payload->Data));
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+
+                ImGui::SetItemAllowOverlap();
+                std::size_t j        = 0;
+                static bool wasMoved = false;
+                for(const auto& cl : ch->get_clips())
+                {
+                    auto starts    = cl->get_starts_at().count();
+                    auto ends      = starts + cl->get_duration().count();
+                    auto stDiv     = starts / double(timemax);
+                    auto edDiv     = ends / double(timemax);
+                    float clipXMin = xmin + stDiv * (xmax - xmin),
+                          clipXMax = xmin + edDiv * (xmax - xmin);
+                    ImGui::SetCursorPos({ xmin, 0.f });
+                    ImGui::InvisibleButton("aaa", { clipXMax - clipXMin, channelHeight });
+                    if(ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+                    {
+                        wasMoved   = true;
+                        auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+                        clipXMin += delta.x;
+                        clipXMax += delta.x;
+                    }
+                    else if(wasMoved)
+                    {
+                        wasMoved   = false;
+                        auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+                        // auto posdiff      = io.MouseDelta.x;
+                        float newClipXmin = clipXMin + delta.x;
+                        auto inDur        = ((newClipXmin - xmin) / (xmax - xmin)) * timemax;
+                        ch->move_clip(j, std::chrono::milliseconds(std::int64_t(inDur)));
+                    }
+                    drawList->AddRectFilled(
+                        { float(clipXMin), canvasPos.y },
+                        { float(clipXMax), canvasPos.y + channelHeight },
+                        0xFF0000AA, 0);
+                    ++j;
+                }
+                ImGui::PopID();
+                ++index;
+            }
             drawList->AddLine(
                 { float(xlinepos), canvasPos.y },
                 { float(xlinepos), canvasPos.y + canvasSize.y },
                 0xFFFF0000,
                 3.f);
         }
-        if(ImGui::BeginDragDropTarget())
-        {
-            if(const auto payload = ImGui::AcceptDragDropPayload("demo"))
-            {
-                tl.get_channel(0)->append_clip(
-                    *static_cast<std::shared_ptr<video>*>(payload->Data));
-            }
-            ImGui::EndDragDropTarget();
-        }
     }
+    ImGui::EndChild();
     ImGui::End();
 }
 void create_playback(timeline& tl)
