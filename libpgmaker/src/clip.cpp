@@ -15,7 +15,7 @@ clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt
     swsCtx{}, vidTimebase{}, audioTimebase{}
 {
     assert(vid);
-    open_input(vid->get_path());
+    open_input(vid->get_info().path);
 }
 clip::~clip()
 {

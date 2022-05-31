@@ -29,7 +29,15 @@ add_subdirectory(lib/imgui)
 add_subdirectory(lib/nativefiledialog)
 
 
-add_executable(pgmaker src/main.cpp)
+add_executable(pgmaker 
+	src/main.cpp
+	src/cmain_menu.cpp
+	src/cvideos.cpp
+	src/cproperties.cpp
+	src/ctimeline.cpp
+	src/cplayback.cpp
+	src/cnode_editor.cpp
+)
 
 target_link_libraries(pgmaker
 	PUBLIC glad

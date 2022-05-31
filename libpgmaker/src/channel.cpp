@@ -347,4 +347,27 @@ int channel::audio_stream_callback(
     }
     return 0;
 }
+
+void channel::move_clip(std::size_t index, const milliseconds& to)
+{
+    if(index >= clips.size()) return;
+    if(to < 0ms) return;
+    auto cl = std::next(clips.begin(), index)->get();
+
+    auto end     = to + cl->get_duration();
+    auto canMove = std::find_if(
+        clips.begin(), clips.end(),
+        [&](auto& clip) {
+            if(clip.get() == cl) return false;
+            if(clip->contains(to) || clip->contains(end))
+                return true;
+            return false;
+        });
+    if(canMove != clips.end()) return;
+
+    stop();
+    cl->move_to(to);
+    recalculate_lenght();
+    start();
+}
 } // namespace libpgmaker

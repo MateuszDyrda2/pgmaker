@@ -51,6 +51,7 @@ class channel
     const std::list<std::unique_ptr<clip>>& get_clips() const;
     milliseconds get_duration() const { return lenght; }
 
+    void move_clip(std::size_t index, const milliseconds& to);
     void jump2(const milliseconds& ts);
     frame* next_frame(const duration& timestamp);
 
