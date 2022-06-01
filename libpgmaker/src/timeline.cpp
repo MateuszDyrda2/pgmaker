@@ -14,13 +14,30 @@ timeline::timeline(const project_settings& settings):
     set_paused(true);
     initialize_audio();
 }
+timeline::timeline(timeline&& other) noexcept:
+    paused(other.paused), settings(other.settings),
+    ts(0), tsChecked(), channels(std::move(other.channels))
+{
+}
+timeline& timeline::operator=(timeline&& other) noexcept
+{
+    if(this != &other)
+    {
+		paused = other.paused;
+		settings = other.settings;
+		ts = milliseconds(0);
+		tsChecked = time_point();
+		channels = std::move(other.channels);
+    }
+    return *this;
+}
 timeline::~timeline()
 {
     drop_audio();
 }
 channel* timeline::add_channel()
 {
-    return channels.emplace_back(make_unique<channel>(*this)).get();
+    return channels.emplace_back(make_unique<channel>(this)).get();
 }
 void timeline::remove_channel(std::size_t index)
 {

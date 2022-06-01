@@ -11,9 +11,9 @@
 namespace libpgmaker {
 using namespace std;
 using namespace chrono_literals;
-channel::channel(const timeline& tl):
+channel::channel(const timeline* tl):
     currentClip{ clips.end() }, prevFrame{},
-    nextFrame{}, stopped{ true }, paused{ true },
+    nextFrame{}, stopped{ true }, paused{ false },
     tl(tl), audioStream{}, lenght(0),
     videoPacketQueue(64), audioPacketQueue(64),
     frameQueue(64)
@@ -21,6 +21,20 @@ channel::channel(const timeline& tl):
     silentBuffer.resize(NB_CHANNELS * NB_FRAMES, 0.f);
     audioBuffer.resize(NB_CHANNELS * NB_FRAMES);
     set_paused(true);
+}
+channel::channel(std::deque<std::unique_ptr<clip>>&& clips):
+    clips{ std::move(clips) }, currentClip{ clips.end() },
+    prevFrame{}, nextFrame{}, stopped{ true }, paused{ false },
+    audioStream{}, lenght(0), videoPacketQueue{ 64 },
+    audioPacketQueue(64), frameQueue(64)
+{
+    silentBuffer.resize(NB_CHANNELS * NB_FRAMES, 0.f);
+    audioBuffer.resize(NB_CHANNELS * NB_FRAMES);
+    set_paused(true);
+}
+void channel::set_timeline(const timeline* tl)
+{
+    this->tl = tl;
 }
 channel::~channel()
 {
@@ -109,7 +123,6 @@ void channel::stop()
     if(decodeWorker.joinable()) decodeWorker.join();
     if(videoWorker.joinable()) videoWorker.join();
 
-    // frameQueue       = frame_queue_t(MAX_PACKETS);
     frame_queue_t(MAX_PACKETS).swap(frameQueue);
     videoPacketQueue = packet_queue_t(MAX_PACKETS);
     audioPacketQueue = packet_queue_t(MAX_PACKETS);
@@ -215,7 +228,6 @@ void channel::video_job()
             nbNoop = 0;
             this_thread::sleep_for(SLEEP_DUR);
         }
-        // packet* p = nullptr;
         packet _packet;
         if(!videoPacketQueue.try_dequeue(_packet))
         {
@@ -327,7 +339,7 @@ int channel::audio_stream_callback(
             std::copy_n(silentBuffer.begin(), sampleCount * NB_CHANNELS, out);
             break;
         }
-        auto tlTs       = tl.get_timestamp();
+        auto tlTs       = tl->get_timestamp();
         auto* c         = pptr->owner;
         auto newPts     = c->audio_convert_pts(pptr->payload->pts);
         const auto diff = newPts - tlTs;

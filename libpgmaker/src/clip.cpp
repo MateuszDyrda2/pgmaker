@@ -8,7 +8,7 @@
 namespace libpgmaker {
 using namespace std;
 clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt):
-    vid(vid), startOffset{}, endOffset{}, startsAt(startsAt),
+    vid(vid), name(vid->get_info().name), startOffset{}, endOffset{}, startsAt(startsAt),
     width{}, height{},
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
@@ -17,6 +17,24 @@ clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt
     assert(vid);
     open_input(vid->get_info().path);
 }
+
+clip::clip(const std::string& name, const milliseconds& startsAt,
+           const milliseconds& startOffset, const milliseconds& endOffset):
+    vid(),
+    name(name), startsAt(startsAt), startOffset(startOffset),
+    endOffset(endOffset), width{}, height{},
+    pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
+    vsIndex{ -1 }, asIndex{ -1 },
+    swsCtx{}, vidTimebase{}, audioTimebase{}
+{
+}
+void clip::assign_video(const std::shared_ptr<video>& vid)
+{
+    assert(vid->get_info().name == name);
+    this->vid = vid;
+    open_input(vid->get_info().path);
+}
+
 clip::~clip()
 {
     swr_free(&swrCtx);

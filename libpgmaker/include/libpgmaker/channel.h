@@ -36,9 +36,12 @@ class channel
     static constexpr std::size_t MAX_PACKETS = 64;
 
   public:
-    channel(const timeline& tl);
+    channel() = default;
+    channel(const timeline* tl);
+    channel(std::deque<std::unique_ptr<clip>>&& clips);
     ~channel();
 
+    void set_timeline(const timeline* tl);
     clip* get_clip(std::size_t index);
     const clip* get_clip(std::size_t index) const;
     clip* operator[](std::size_t index);
@@ -75,7 +78,7 @@ class channel
     std::vector<float> audioBuffer;
     PaStream* audioStream;
 
-    const timeline& tl;
+    const timeline* tl;
 
   private:
     void stop();

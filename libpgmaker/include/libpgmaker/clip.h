@@ -15,9 +15,13 @@ class clip
     using milliseconds = std::chrono::milliseconds;
 
   public:
+    clip() = default;
     clip(const std::shared_ptr<video>& vid, milliseconds startsAt);
+    clip(const std::string& name, const milliseconds& startsAt,
+         const milliseconds& startOffset, const milliseconds& endOffset);
     ~clip();
 
+    void assign_video(const std::shared_ptr<video>& vid);
     const milliseconds& get_starts_at() const { return startsAt; }
     const milliseconds& get_start_offset() const { return startOffset; }
     const milliseconds& get_end_offset() const { return endOffset; }
@@ -41,9 +45,11 @@ class clip
     std::int64_t audio_reconvert_pts(const milliseconds& pts) const;
     milliseconds video_convert_pts(std::int64_t pts) const;
     std::int64_t video_reconvert_pts(const milliseconds& pts) const;
+    const std::string& get_name() const { return vid->get_info().name; }
 
   private:
     std::shared_ptr<video> vid;
+    std::string name;
     milliseconds startOffset;
     milliseconds endOffset;
     milliseconds startsAt;

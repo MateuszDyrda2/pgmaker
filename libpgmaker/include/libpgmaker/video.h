@@ -8,6 +8,7 @@
 namespace libpgmaker {
 struct video_info
 {
+    std::string name;
     std::string path;
     std::uint32_t width, height;
     std::chrono::milliseconds duration;

@@ -27,6 +27,15 @@ add_subdirectory(lib/glfw)
 add_subdirectory(libpgmaker)
 add_subdirectory(lib/imgui)
 add_subdirectory(lib/nativefiledialog)
+include(FetchContent)
+
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+FetchContent_declare(
+	json
+	GIT_REPOSITORY		https://github.com/nlohmann/json.git 
+	GIT_TAG 			master
+)
+FetchContent_MakeAvailable(json)
 
 
 add_executable(pgmaker 
@@ -37,14 +46,17 @@ add_executable(pgmaker
 	src/ctimeline.cpp
 	src/cplayback.cpp
 	src/cnode_editor.cpp
+	src/serializer.cpp
 )
 
 target_link_libraries(pgmaker
-	PUBLIC glad
-	PUBLIC glfw ${GLFW_LIBRARIES}
-	PUBLIC nfd
-	PUBLIC libpgmaker
-	PUBLIC imgui
+	PUBLIC 
+	glad
+	glfw ${GLFW_LIBRARIES}
+	nfd
+	libpgmaker
+	imgui
+	nlohmann_json::nlohmann_json
 )
 
 target_include_directories(

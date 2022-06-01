@@ -15,11 +15,15 @@ class timeline
     using duration     = channel::duration;
 
   public:
+    timeline() = default;
     /** @brief Create a timeline specifying the settings.
      * The settings can be changed at any moment
      * @param settings project settings
      */
     timeline(const project_settings& settings);
+    timeline(std::deque<std::unique_ptr<channel>>&& channels);
+    timeline(timeline&& other) noexcept;
+    timeline& operator=(timeline&& other) noexcept;
     ~timeline();
     /** @brief Add a channel to the timeline
      * @return a pointer to the newly added channel

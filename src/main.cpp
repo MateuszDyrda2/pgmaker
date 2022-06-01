@@ -75,7 +75,7 @@ int main()
     auto ch = tl.add_channel();
     std::vector<std::shared_ptr<video>> videos;
 
-    cmain_menu menu(videos);
+    cmain_menu menu(videos, tl);
     cvideos videoWindow(videos);
     cproperties propertyWindow;
     ctimeline timelineWindow(tl);

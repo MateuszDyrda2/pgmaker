@@ -1,6 +1,7 @@
 #include <libpgmaker/video_reader.h>
 
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <stdexcept>
@@ -9,6 +10,7 @@
 
 namespace libpgmaker {
 using namespace std;
+namespace fs = filesystem;
 inline bool file_exists(const std::string& path)
 {
     ifstream f(path);
@@ -95,6 +97,8 @@ video_reader::video_handle& video_reader::video_handle::load_metadata()
     info.pixelFormat = pCodecContext->pix_fmt;
     info.codecId     = pCodecContext->codec_id;
     info.bitrate     = pCodecContext->bit_rate;
+    fs::path p       = info.path;
+    info.name        = p.stem();
 
     return *this;
 }
