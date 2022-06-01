@@ -15,7 +15,7 @@ clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt
     swsCtx{}, vidTimebase{}, audioTimebase{}
 {
     assert(vid);
-    open_input(vid->get_path());
+    open_input(vid->get_info().path);
 }
 clip::~clip()
 {
@@ -132,22 +132,29 @@ void clip::reset()
 {
     seek_start();
 }
-bool clip::get_packet(AVPacket** pPacket)
+bool clip::get_packet(packet& pPacket)
 {
-    if(av_read_frame(pFormatCtx, *pPacket) < 0)
+    AVPacket* p = av_packet_alloc();
+    auto res    = av_read_frame(pFormatCtx, p);
+    if(res == AVERROR_EOF)
         return false;
+    else if(res < 0)
+    {
+        return true;
+    }
 
-    const auto time      = (*pPacket)->pts * vidTimebase.num / (double)vidTimebase.den;
+    const auto time      = p->pts * vidTimebase.num / (double)vidTimebase.den;
     const auto millitime = chrono::duration<double>(time);
     const auto endtime   = vid->get_info().duration - endOffset;
-    vidCurrentStreamPos  = (*pPacket)->pos;
-    vidCurrentTs         = (*pPacket)->pts;
-
+    vidCurrentStreamPos  = p->pos;
+    vidCurrentTs         = p->pts;
+    pPacket.owner        = this;
+    pPacket.payload      = p;
     return (millitime < endtime);
 }
-bool clip::get_frame(AVPacket* pPacket, AVFrame** frame)
+bool clip::get_frame(packet& pPacket, AVFrame** frame)
 {
-    if(avcodec_send_packet(pVideoCodecCtx, pPacket) < 0)
+    if(avcodec_send_packet(pVideoCodecCtx, pPacket.payload) < 0)
     {
         throw runtime_error("Failed to decode a packet");
     }
@@ -228,11 +235,12 @@ bool clip::seek(const milliseconds& ts)
     assert(ts <= startsAt + get_duration());
 
     auto currentPos = video_convert_pts(vidCurrentTs);
-    auto diff       = ts - currentPos;
+    auto realTs     = ts - startsAt + startOffset;
+    auto diff       = realTs - currentPos;
 
     const auto currentPosInSec = chrono::duration_cast<chrono::duration<double>>(currentPos);
     const auto diffInSec       = chrono::duration_cast<chrono::duration<double>>(diff);
-    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(ts);
+    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(realTs);
 
     std::int64_t curr = currentPosInSec.count() * AV_TIME_BASE;
     std::int64_t inc  = diffInSec.count() * AV_TIME_BASE;

@@ -27,6 +27,16 @@ void timeline::remove_channel(std::size_t index)
     assert(index < channels.size());
     channels.erase(channels.begin() + index);
 }
+void timeline::remove_channel(channel* ch)
+{
+    assert(ch != nullptr);
+    auto toEr = find_if(channels.begin(), channels.end(),
+                        [&](auto& item) { return item.get() == ch; });
+    if(toEr == channels.end())
+        return;
+
+    channels.erase(toEr);
+}
 channel* timeline::get_channel(std::size_t index)
 {
     assert(index < channels.size());
@@ -69,7 +79,7 @@ frame* timeline::next_frame()
     vector<frame*> frames;
     for(auto& ch : channels)
     {
-        frames.push_back(ch->next_frame(ts));
+        frames.push_back(ch->next_frame(ts, paused));
     }
     return frames.front();
 }
@@ -125,16 +135,23 @@ void timeline::rebuild()
     ts        = 0ms;
     tsChecked = high_resolution_clock::now();
 }
-void timeline::jump2(const milliseconds& ts)
+void timeline::seek(const milliseconds& ts)
 {
     using namespace chrono;
     auto realTs = max(milliseconds(0), min(ts, get_duration()));
 
     this->ts = realTs;
-    for(auto& ch : channels)
-    {
-        ch->jump2(realTs);
-    }
+
+    std::for_each(
+        channels.begin(), channels.end(),
+        [](auto& ch) { ch->stop(); });
+    std::for_each(
+        channels.begin(), channels.end(),
+        [realTs](auto& ch) { ch->seek(realTs); });
+    std::for_each(
+        channels.begin(), channels.end(),
+        [](auto& ch) { ch->start(); });
+
     tsChecked = high_resolution_clock::now();
 }
 
@@ -156,5 +173,44 @@ timeline::milliseconds timeline::get_timestamp() const
         return ts;
     else
         return ts + duration_cast<milliseconds>(high_resolution_clock::now() - tsChecked);
+}
+bool timeline::add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at)
+{
+    assert(ch < channels.size());
+    stop();
+    auto res = channels[ch]->add_clip(vid, at);
+    start();
+    return res;
+}
+void timeline::append_clip(std::size_t ch, const std::shared_ptr<video>& vid)
+{
+    assert(ch < channels.size());
+    stop();
+    channels[ch]->append_clip(vid);
+    start();
+}
+void timeline::move_clip(std::size_t ch, std::size_t cl, const milliseconds& to)
+{
+    assert(ch < channels.size());
+    stop();
+    channels[ch]->move_clip(cl, to);
+    start();
+}
+void timeline::stop()
+{
+    set_paused(true);
+    std::for_each(
+        channels.begin(), channels.end(),
+        [](auto& ch) {
+            ch->stop();
+        });
+}
+void timeline::start()
+{
+    std::for_each(
+        channels.begin(), channels.end(),
+        [](auto& ch) {
+            ch->start();
+        });
 }
 } // namespace libpgmaker

@@ -3,14 +3,12 @@
 
 #include <glad/glad.h>
 
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-#include <imgui_impl_opengl3_loader.h>
-#include <imgui_internal.h>
-
-#include <libpgmaker/timeline.h>
-#include <libpgmaker/video_reader.h>
+#include "cmain_menu.h"
+#include "cnode_editor.h"
+#include "cplayback.h"
+#include "cproperties.h"
+#include "ctimeline.h"
+#include "cvideos.h"
 
 #include <nfd.h>
 
@@ -19,18 +17,15 @@
 #include <vector>
 
 using namespace libpgmaker;
-static void create_main_menu(std::vector<std::shared_ptr<video>>& videos, video_reader& reader);
-static void create_main_dockspace(timeline& tl, std::vector<std::shared_ptr<video>>& videos);
+static void create_main_dockspace(cvideos& videoWindow,
+                                  cproperties& propertyWindow,
+                                  ctimeline& timelineWindow,
+                                  cplayback& playbackWindow,
+                                  cnode_editor& nodeEditorWindow);
 static void initialize_layout(ImGuiID dockspaceId);
-static void create_videos(std::vector<std::shared_ptr<video>>& videos);
-static void create_properties();
-static void create_timeline(timeline& tl);
-static void create_playback(timeline& tl);
-static void create_node_editor();
 
 static std::pair<int, int> windowSize{ 1920, 1080 };
-static std::pair<std::uint32_t, std::uint32_t> textureSize{ 1080, 720 };
-static unsigned int texture;
+static video* selectedVideo = nullptr;
 
 int main()
 {
@@ -77,22 +72,15 @@ int main()
     NFD_Init();
 
     timeline tl(project_settings{});
-    video_reader reader;
-    // auto vid = reader.load_file("/home/matzix/shared/PGMaker/libpgmaker/data/1232.mp4");
     auto ch = tl.add_channel();
-    // ch->add_clip(vid, std::chrono::milliseconds(0));
-    /////////////////////texture///////////
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                 textureSize.first, textureSize.second, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, 0);
-    ////////////////////////////////////////
     std::vector<std::shared_ptr<video>> videos;
+
+    cmain_menu menu(videos);
+    cvideos videoWindow(videos);
+    cproperties propertyWindow;
+    ctimeline timelineWindow(tl);
+    cplayback playbackWindow(tl);
+    cnode_editor nodeEditorWindow;
 
     while(!glfwWindowShouldClose(window))
     {
@@ -102,9 +90,9 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ////
-        create_main_menu(videos, reader);
+        menu.draw();
         ////
-        create_main_dockspace(tl, videos);
+        create_main_dockspace(videoWindow, propertyWindow, timelineWindow, playbackWindow, nodeEditorWindow);
         ////
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -120,33 +108,11 @@ int main()
     glfwDestroyWindow(window);
     return 0;
 }
-void create_main_menu(std::vector<std::shared_ptr<video>>& videos, video_reader& reader)
-{
-    if(ImGui::BeginMainMenuBar())
-    {
-        if(ImGui::BeginMenu("File"))
-        {
-            if(ImGui::MenuItem("OpenVideo"))
-            {
-                nfdchar_t* outPath;
-                auto result = NFD_OpenDialog(&outPath, NULL, 0, NULL);
-                if(result == NFD_OKAY)
-                {
-                    printf("%s\n", outPath);
-                    videos.push_back(reader.load_file(outPath));
-                    NFD_FreePath(outPath);
-                }
-            };
-            ImGui::EndMenu();
-        }
-        if(ImGui::BeginMenu("Edit"))
-        {
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
-    }
-}
-void create_main_dockspace(timeline& tl, std::vector<std::shared_ptr<video>>& videos)
+void create_main_dockspace(cvideos& videoWindow,
+                           cproperties& propertyWindow,
+                           ctimeline& timelineWindow,
+                           cplayback& playbackWindow,
+                           cnode_editor& nodeEditorWindow)
 {
     ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
     ImGuiWindowFlags windowFlags      = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
@@ -177,174 +143,13 @@ void create_main_dockspace(timeline& tl, std::vector<std::shared_ptr<video>>& vi
         else
         {
             ImGui::DockSpace(dockspaceId, ImVec2(0, 0), dockspaceFlags);
-            create_timeline(tl);
-            create_videos(videos);
-            create_properties();
-            create_node_editor();
-            create_playback(tl);
-        }
-    }
-    ImGui::End();
-}
-void create_videos(std::vector<std::shared_ptr<video>>& videos)
-{
-    ImGui::Begin("Videos");
-    {
-        for(std::size_t i = 0; i < videos.size(); ++i)
-        {
-            if((i % 3) != 0)
-            {
-                ImGui::SameLine(0.f);
-            }
-            if(ImGui::ImageButton(reinterpret_cast<ImTextureID>(videos[i]->get_texture()),
-                                  ImVec2(60.f, 60.f)))
-            {
-            }
-            if(ImGui::BeginDragDropSource())
-            {
-                ImGui::SetDragDropPayload("demo", &videos[i], sizeof(&videos[i]));
-                ImGui::EndDragDropSource();
-            }
-        }
-    }
-    ImGui::End();
-}
-void create_properties()
-{
-    ImGui::Begin("Properties");
-    ImGui::Text("hello from properties");
-    ImGui::End();
-}
-void create_timeline(timeline& tl)
-{
-    ImGui::Begin("Timeline");
-    {
-        auto regSize = ImGui::GetWindowSize().x / 2.f;
-        ImGui::SetCursorPos(ImVec2(regSize - 70.f, 20.f));
-        if(ImGui::Button("<<", ImVec2(40.f, 40.f)))
-        {
-            tl.jump2(tl.get_timestamp() - std::chrono::milliseconds(3000));
-        }
-        ImGui::SetCursorPos(ImVec2(regSize - 20.f, 20.f));
-        if(ImGui::Button(">", ImVec2(40.f, 40.f)))
-        {
-            // tl.set_paused(!tl.is_paused());
-            tl.toggle_pause();
-        }
-        ImGui::SetCursorPos(ImVec2(regSize + 30.f, 20.f));
-        if(ImGui::Button(">>", ImVec2(40.f, 40.f)))
-        {
-            tl.jump2(tl.get_timestamp() + std::chrono::milliseconds(3000));
-        }
-        {
-            auto& io                        = ImGui::GetIO();
-            auto drawList                   = ImGui::GetWindowDrawList();
-            auto canvasSize                 = ImGui::GetContentRegionAvail();
-            auto canvasPos                  = ImGui::GetCursorScreenPos();
-            static constexpr auto textWidth = 100.f;
-            float xmin                      = canvasPos.x + textWidth;
-            float xmax                      = canvasPos.x + canvasSize.x;
-            float channelHeight = 60, channelMargin = 10;
 
-            std::size_t index  = 0;
-            const auto timemax = 20000;
-            for(const auto& ch : tl.get_channels())
-            {
-                ImGui::InvisibleButton("canvas", ImVec2(canvasSize.x - canvasPos.x, channelHeight));
-                float spacing = index * (channelHeight + channelMargin);
-                drawList->AddRectFilled(
-                    { xmin, canvasPos.y },
-                    { xmax, canvasPos.y + channelHeight },
-                    0xFF3D3837, 0);
-                drawList->AddText(canvasPos, 0xFFFFFFFF, "Channel 1");
-                for(const auto& cl : ch->get_clips())
-                {
-                    auto starts    = cl->get_starts_at().count();
-                    auto ends      = cl->get_duration().count();
-                    auto stDiv     = starts / double(timemax);
-                    auto edDiv     = ends / double(timemax);
-                    float clipXMin = xmin + stDiv * (xmax - xmin),
-                          clipXMax = xmin + edDiv * (xmax - xmin);
-                    drawList->AddRectFilled(
-                        { float(clipXMin), canvasPos.y },
-                        { float(clipXMax), canvasPos.y + channelHeight },
-                        0xFF0000AA, 0);
-                }
-                ++index;
-            }
-            if(ImGui::IsItemActive())
-            {
-                auto mousePos = io.MouseClickedPos[0];
-                if(mousePos.x >= xmin && mousePos.x <= xmax)
-                {
-                    auto timePos = (mousePos.x - xmin) / (xmax - xmin) * timemax;
-                    tl.jump2(std::chrono::milliseconds(std::int64_t(timePos)));
-                }
-            }
-            const auto ts  = tl.get_timestamp().count();
-            float xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
-            drawList->AddLine(
-                { float(xlinepos), canvasPos.y },
-                { float(xlinepos), canvasPos.y + canvasSize.y },
-                0xFFFF0000,
-                3.f);
+            timelineWindow.draw();
+            videoWindow.draw();
+            propertyWindow.draw();
+            nodeEditorWindow.draw();
+            playbackWindow.draw();
         }
-        if(ImGui::BeginDragDropTarget())
-        {
-            if(const auto payload = ImGui::AcceptDragDropPayload("demo"))
-            {
-                tl.get_channel(0)->append_clip(
-                    *static_cast<std::shared_ptr<video>*>(payload->Data));
-            }
-            ImGui::EndDragDropTarget();
-        }
-    }
-    ImGui::End();
-}
-void create_playback(timeline& tl)
-{
-    auto documentFlags =
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
-        | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground
-        | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize;
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
-    if(ImGui::Begin("Playback", NULL, documentFlags))
-    {
-        // ImGui::BeginChild("VideoRender");
-
-        ////////////////////////
-        auto pos  = ImGui::GetWindowPos();
-        auto size = ImGui::GetWindowSize();
-
-        glBindTexture(GL_TEXTURE_2D, texture);
-        auto frame = tl.next_frame();
-        if(frame)
-        {
-            if(frame->size != textureSize)
-            {
-                textureSize = frame->size;
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureSize.first, textureSize.second,
-                             0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-            }
-            else
-            {
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-                                textureSize.first, textureSize.second, GL_RGBA,
-                                GL_UNSIGNED_BYTE, frame->data.data());
-            }
-        }
-        ImGui::Image(reinterpret_cast<ImTextureID>(texture), size);
-        ////////////////////////
-        // ImGui::EndChild();
-    }
-    ImGui::End();
-    ImGui::PopStyleVar();
-}
-void create_node_editor()
-{
-    if(ImGui::Begin("NodeEditor"))
-    {
     }
     ImGui::End();
 }
