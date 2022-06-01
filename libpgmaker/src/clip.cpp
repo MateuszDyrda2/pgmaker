@@ -135,8 +135,13 @@ void clip::reset()
 bool clip::get_packet(packet& pPacket)
 {
     AVPacket* p = av_packet_alloc();
-    if(av_read_frame(pFormatCtx, p) < 0)
+    auto res    = av_read_frame(pFormatCtx, p);
+    if(res == AVERROR_EOF)
         return false;
+    else if(res < 0)
+    {
+        return true;
+    }
 
     const auto time      = p->pts * vidTimebase.num / (double)vidTimebase.den;
     const auto millitime = chrono::duration<double>(time);
@@ -230,11 +235,12 @@ bool clip::seek(const milliseconds& ts)
     assert(ts <= startsAt + get_duration());
 
     auto currentPos = video_convert_pts(vidCurrentTs);
-    auto diff       = ts - currentPos;
+    auto realTs     = ts - startsAt + startOffset;
+    auto diff       = realTs - currentPos;
 
     const auto currentPosInSec = chrono::duration_cast<chrono::duration<double>>(currentPos);
     const auto diffInSec       = chrono::duration_cast<chrono::duration<double>>(diff);
-    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(ts);
+    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(realTs);
 
     std::int64_t curr = currentPosInSec.count() * AV_TIME_BASE;
     std::int64_t inc  = diffInSec.count() * AV_TIME_BASE;

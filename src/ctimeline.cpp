@@ -16,7 +16,7 @@ void ctimeline::draw()
         ImGui::SetCursorPos(ImVec2(regSize - 70.f, 20.f));
         if(ImGui::Button("<<", ImVec2(40.f, 40.f)))
         {
-            tl.jump2(tl.get_timestamp() - std::chrono::milliseconds(3000));
+            tl.seek(tl.get_timestamp() - std::chrono::milliseconds(3000));
         }
         ImGui::SetCursorPos(ImVec2(regSize - 20.f, 20.f));
         if(ImGui::Button(">", ImVec2(40.f, 40.f)))
@@ -27,7 +27,7 @@ void ctimeline::draw()
         ImGui::SetCursorPos(ImVec2(regSize + 30.f, 20.f));
         if(ImGui::Button(">>", ImVec2(40.f, 40.f)))
         {
-            tl.jump2(tl.get_timestamp() + std::chrono::milliseconds(3000));
+            tl.seek(tl.get_timestamp() + std::chrono::milliseconds(3000));
         }
         ImGui::BeginChild("TimelineContent", ImGui::GetContentRegionAvail());
         {
@@ -51,7 +51,7 @@ void ctimeline::draw()
                 if(mousePos.x >= xmin && mousePos.x <= xmax)
                 {
                     auto timePos = (mousePos.x - xmin) / (xmax - xmin) * timemax;
-                    tl.jump2(std::chrono::milliseconds(std::int64_t(timePos)));
+                    tl.seek(std::chrono::milliseconds(std::int64_t(timePos)));
                 }
             }
             const auto ts  = tl.get_timestamp().count();
@@ -74,8 +74,8 @@ void ctimeline::draw()
                 {
                     if(const auto payload = ImGui::AcceptDragDropPayload("demo"))
                     {
-                        tl.get_channel(0)->append_clip(
-                            *static_cast<std::shared_ptr<video>*>(payload->Data));
+                        auto data = *static_cast<std::shared_ptr<video>*>(payload->Data);
+                        tl.append_clip(0, data);
                     }
                     ImGui::EndDragDropTarget();
                 }
@@ -107,12 +107,12 @@ void ctimeline::draw()
                         // auto posdiff      = io.MouseDelta.x;
                         float newClipXmin = clipXMin + delta.x;
                         auto inDur        = ((newClipXmin - xmin) / (xmax - xmin)) * timemax;
-                        ch->move_clip(j, std::chrono::milliseconds(std::int64_t(inDur)));
+                        tl.move_clip(index, j, std::chrono::milliseconds(std::int64_t(inDur)));
                     }
                     drawList->AddRectFilled(
                         { float(clipXMin), canvasPos.y },
                         { float(clipXMax), canvasPos.y + channelHeight },
-                        0xFF0000AA, 0);
+                        0xFF0000AA, 2.5f);
                     ++j;
                 }
                 ImGui::PopID();

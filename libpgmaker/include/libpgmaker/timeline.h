@@ -49,6 +49,9 @@ class timeline
      * @return pointer to the requested frame
      */
     frame* next_frame();
+    bool add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at);
+    void append_clip(std::size_t ch, const std::shared_ptr<video>& vid);
+    void move_clip(std::size_t ch, std::size_t cl, const milliseconds& to);
     /** @brief Set the channel to be paused / unpaused
      * @param value should channel be paused
      */
@@ -62,7 +65,7 @@ class timeline
     /** @brief Jumps to the specified moment in the timeline
      * @param ts timestamp to be set
      */
-    void jump2(const milliseconds& ts);
+    void seek(const milliseconds& ts);
     /** @return Current timestamp */
     milliseconds get_timestamp() const;
     /** @return Duration of the whole timeline */
@@ -82,5 +85,8 @@ class timeline
     void initialize_audio();
     void drop_audio();
     void rebuild();
+
+    void stop();
+    void start();
 };
 } // namespace libpgmaker

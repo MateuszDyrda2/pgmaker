@@ -23,8 +23,6 @@ class timeline;
 class channel
 {
   public:
-    // using spsc_queue   = spsc_queue<T, S>;
-    //  using spsc_queue   = tsqueue<T, S>;
     using packet_queue_t = moodycamel::ReaderWriterQueue<packet>;
     using frame_queue_t  = moodycamel::BlockingReaderWriterCircularBuffer<frame*>;
     using worker_type    = std::thread;
@@ -41,25 +39,28 @@ class channel
     channel(const timeline& tl);
     ~channel();
 
-    bool add_clip(const std::shared_ptr<video>& vid, const milliseconds& at);
-    bool append_clip(const std::shared_ptr<video>& vid);
     clip* get_clip(std::size_t index);
     const clip* get_clip(std::size_t index) const;
     clip* operator[](std::size_t index);
     const clip* operator[](std::size_t index) const;
-    std::list<std::unique_ptr<clip>>& get_clips();
-    const std::list<std::unique_ptr<clip>>& get_clips() const;
+    std::deque<std::unique_ptr<clip>>& get_clips();
+    const std::deque<std::unique_ptr<clip>>& get_clips() const;
     milliseconds get_duration() const { return lenght; }
 
+  private:
+    friend class timeline;
+
+    bool add_clip(const std::shared_ptr<video>& vid, const milliseconds& at);
+    bool append_clip(const std::shared_ptr<video>& vid);
     void move_clip(std::size_t index, const milliseconds& to);
-    void jump2(const milliseconds& ts);
-    frame* next_frame(const duration& timestamp);
+    void seek(const milliseconds& ts);
+    frame* next_frame(const duration& timestamp, bool paused);
 
     bool set_paused(bool value);
 
   private:
-    std::list<std::unique_ptr<clip>> clips;
-    std::list<std::unique_ptr<clip>>::iterator currentClip;
+    std::deque<std::unique_ptr<clip>> clips;
+    std::deque<std::unique_ptr<clip>>::iterator currentClip;
     packet_queue_t videoPacketQueue;
     packet_queue_t audioPacketQueue;
     frame_queue_t frameQueue;

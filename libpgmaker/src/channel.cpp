@@ -33,9 +33,7 @@ bool channel::add_clip(const shared_ptr<video>& vid, const chrono::milliseconds&
 {
     clips.emplace_back(make_unique<clip>(vid, at));
     currentClip = clips.begin();
-    stop();
     recalculate_lenght();
-    start();
     return true;
 }
 bool channel::append_clip(const std::shared_ptr<video>& vid)
@@ -62,20 +60,21 @@ const clip* channel::operator[](std::size_t index) const
 {
     return get_clip(index);
 }
-std::list<std::unique_ptr<clip>>& channel::get_clips()
+std::deque<std::unique_ptr<clip>>& channel::get_clips()
 {
     return clips;
 }
-const std::list<std::unique_ptr<clip>>& channel::get_clips() const
+const std::deque<std::unique_ptr<clip>>& channel::get_clips() const
 {
     return clips;
 }
-frame* channel::next_frame(const duration& timestamp)
+frame* channel::next_frame(const duration& timestamp, bool paused)
 {
     if(timestamp > lenght)
     {
         return nullptr;
     }
+    if(paused) return prevFrame;
     if(!nextFrame)
     {
         if(!frameQueue.try_dequeue(nextFrame))
@@ -116,6 +115,10 @@ void channel::stop()
     audioPacketQueue = packet_queue_t(MAX_PACKETS);
 
     drop_audio();
+    for(auto& clip : clips)
+    {
+        clip->reset();
+    }
 
     nextFrame = prevFrame = nullptr;
 }
@@ -126,25 +129,21 @@ void channel::start()
     videoWorker  = worker_type(&channel::video_job, this);
     init_audio();
 }
-void channel::jump2(const chrono::milliseconds& ts)
+void channel::seek(const chrono::milliseconds& ts)
 {
-    stop();
-
-    auto it = find_if(
-        clips.begin(), clips.end(),
-        [&, this](auto& c) {
-            return c->contains(ts);
-        });
-    if(it == clips.end()) return;
-
-    currentClip = it;
-    auto cl     = it->get();
-    if(!cl->seek(ts))
+    currentClip = clips.begin();
+    for(auto iter = clips.begin(); iter != clips.end(); ++iter)
     {
-        throw runtime_error("Failed to jump to requested timestamp");
-    }
+        if(!(*iter)->contains(ts))
+            continue;
 
-    start();
+        currentClip = iter;
+        if(!(*iter)->seek(ts))
+        {
+            throw runtime_error("Failed to jump to requested timestamp");
+        }
+        break;
+    }
 }
 void channel::decoding_job()
 {
@@ -189,6 +188,10 @@ void channel::decoding_job()
             {
                 // the clip has ended
                 advance(currentClip, 1);
+                if(currentClip != clips.end())
+                {
+                    (*currentClip)->reset();
+                }
             }
         }
         else
@@ -350,7 +353,8 @@ int channel::audio_stream_callback(
 
 void channel::move_clip(std::size_t index, const milliseconds& to)
 {
-    if(index >= clips.size()) return;
+    assert(index < clips.size());
+
     if(to < 0ms) return;
     auto cl = std::next(clips.begin(), index)->get();
 
@@ -365,9 +369,7 @@ void channel::move_clip(std::size_t index, const milliseconds& to)
         });
     if(canMove != clips.end()) return;
 
-    stop();
     cl->move_to(to);
     recalculate_lenght();
-    start();
 }
 } // namespace libpgmaker
