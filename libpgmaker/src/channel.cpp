@@ -390,6 +390,15 @@ void channel::move_clip(std::size_t index, const milliseconds& to)
     if(canMove != clips.end()) return;
 
     cl->move_to(to);
+
+    reorder_clips();
     recalculate_lenght();
+}
+void channel::reorder_clips()
+{
+    std::sort(clips.begin(), clips.end(),
+              [](const auto& lhs, const auto& rhs) {
+                  return lhs->get_starts_at() < rhs->get_starts_at();
+              });
 }
 } // namespace libpgmaker

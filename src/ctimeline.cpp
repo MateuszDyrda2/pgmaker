@@ -82,26 +82,32 @@ void ctimeline::draw()
                 }
 
                 ImGui::SetItemAllowOverlap();
-                std::size_t j        = 0;
-                static bool wasMoved = false;
+                std::size_t j                 = 0;
+                static bool wasMoved          = false;
+                static std::size_t movedIndex = 0;
                 for(const auto& cl : ch->get_clips())
                 {
+                    ImGui::PushID(tl.get_channels().size() + j);
                     auto starts    = cl->get_starts_at().count();
                     auto ends      = starts + cl->get_duration().count();
                     auto stDiv     = starts / double(timemax);
                     auto edDiv     = ends / double(timemax);
                     float clipXMin = xmin + stDiv * (xmax - xmin),
                           clipXMax = xmin + edDiv * (xmax - xmin);
-                    ImGui::SetCursorPos({ xmin, 0.f });
-                    ImGui::InvisibleButton("aaa", { clipXMax - clipXMin, channelHeight });
-                    if(ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+                    ImGui::SetCursorPos({ clipXMin, 0.f });
+                    ImGui::InvisibleButton("", { clipXMax - clipXMin, channelHeight });
+
+                    bool isItemActive    = ImGui::IsItemActive();
+                    bool isMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+                    if(isItemActive && isMouseDragging)
                     {
                         wasMoved   = true;
+                        movedIndex = j;
                         auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
                         clipXMin += delta.x;
                         clipXMax += delta.x;
                     }
-                    else if(wasMoved)
+                    else if(wasMoved && !isMouseDragging && movedIndex == j)
                     {
                         wasMoved   = false;
                         auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
@@ -115,6 +121,7 @@ void ctimeline::draw()
                         { float(clipXMax), canvasPos.y + channelHeight },
                         0xFF0000AA, 2.5f);
                     ++j;
+                    ImGui::PopID();
                 }
                 ImGui::PopID();
                 ++index;

@@ -56,7 +56,7 @@ class channel
 
     bool add_clip(const std::shared_ptr<video>& vid, const milliseconds& at);
     bool add_clip(const std::shared_ptr<video>& vid, const milliseconds& at,
-	const milliseconds& startOffset, const milliseconds& endOffset);
+                  const milliseconds& startOffset, const milliseconds& endOffset);
     bool append_clip(const std::shared_ptr<video>& vid);
     void move_clip(std::size_t index, const milliseconds& to);
     void seek(const milliseconds& ts);
@@ -91,6 +91,7 @@ class channel
     void drop_audio();
     void decoding_job();
     void video_job();
+    void reorder_clips();
     void recalculate_lenght();
     int audio_stream_callback(
         void* output,
