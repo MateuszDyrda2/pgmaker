@@ -121,6 +121,13 @@ int main()
                 NFD_FreePath(outPath);
             }
         });
+    command_handler::listen(
+        "SaveProject",
+        []() {
+            auto proj = project_manager::get_current_project();
+            if(!proj) return;
+            proj->save();
+        });
 
     while(!glfwWindowShouldClose(window))
     {
