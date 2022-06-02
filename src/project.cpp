@@ -8,6 +8,7 @@ using namespace libpgmaker;
 std::unique_ptr<project> project_manager::loadedProject;
 project* project_manager::create_project(const std::string& path)
 {
+    // TODO: MEMORY LEAK!!!!
     loadedProject = std::make_unique<project>(path);
     return loadedProject.get();
 }
@@ -28,7 +29,7 @@ project::project(const std::filesystem::path& path,
                  const std::filesystem::path& tmpDirectory,
                  const std::filesystem::path& assetDirectory):
     videos(),
-    tl(project_settings{ { 1920, 1080 },  60 }),
+    tl(project_settings{ { 1920, 1080 }, 60 }),
     path(path),
     workingDirectory(workingDirectory),
     tmpDirectory(tmpDirectory), assetDirectory(assetDirectory)
@@ -85,7 +86,7 @@ project::project(const std::filesystem::path& path,
 }
 project::project(const std::filesystem::path& path):
     videos(),
-    tl(project_settings{{ 1920, 1080 }, 60 }),
+    tl(project_settings{ { 1920, 1080 }, 60 }),
     path(path)
 {
     workingDirectory = path.parent_path();

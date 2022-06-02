@@ -204,6 +204,7 @@ void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
     const auto pts    = iFrame->pts * vidTimebase.num / double(vidTimebase.den);
     const auto ts     = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));
     const auto realTs = startsAt - startOffset + ts;
+    av_frame_unref(iFrame);
 
     (*oFrame)->timestamp = realTs;
 }
