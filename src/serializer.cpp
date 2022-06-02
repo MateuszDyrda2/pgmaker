@@ -76,10 +76,10 @@ void to_json(json& j, const timeline& tl)
 //     auto channels = j.get<std::deque<std::unique_ptr<channel>>>();
 //     tl            = timeline(std::move(channels));
 // }
-void to_json(json& j, const serializer& s)
-{
-    j = { { "videos", s.videos }, { "timeline", s.tl } };
-}
+// void to_json(json& j, const serializer& s)
+//{
+//    j = { { "videos", s.videos }, { "timeline", s.tl } };
+//}
 // void from_json(const json& j, deserializer& s)
 //{
 //     j.at("videos").get_to(s.videos);

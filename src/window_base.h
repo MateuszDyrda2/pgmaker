@@ -8,6 +8,8 @@
 #include <imgui_impl_opengl3_loader.h>
 #include <imgui_internal.h>
 
+#include "project.h"
+
 class window_base
 {
   public:

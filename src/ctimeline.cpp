@@ -1,8 +1,7 @@
 #include "ctimeline.h"
 
 using namespace libpgmaker;
-ctimeline::ctimeline(timeline& tl):
-    tl(tl)
+ctimeline::ctimeline()
 {
 }
 ctimeline::~ctimeline()
@@ -10,6 +9,8 @@ ctimeline::~ctimeline()
 }
 void ctimeline::draw()
 {
+    auto proj = project_manager::get_current_project();
+    auto& tl  = proj->get_timeline();
     ImGui::Begin("Timeline");
     {
         auto regSize = ImGui::GetWindowSize().x / 2.f;
@@ -117,6 +118,10 @@ void ctimeline::draw()
                 }
                 ImGui::PopID();
                 ++index;
+            }
+            if(ImGui::Button("+", ImVec2(40, 40)))
+            {
+                tl.add_channel();
             }
             drawList->AddLine(
                 { float(xlinepos), canvasPos.y },

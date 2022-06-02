@@ -1,8 +1,7 @@
 #include "cplayback.h"
 
 using namespace libpgmaker;
-cplayback::cplayback(libpgmaker::timeline& tl):
-    tl(tl)
+cplayback::cplayback()
 {
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -19,6 +18,8 @@ cplayback::~cplayback()
 }
 void cplayback::draw()
 {
+    auto proj = project_manager::get_current_project();
+    auto& tl  = proj->get_timeline();
     auto documentFlags =
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
         | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground

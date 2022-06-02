@@ -37,7 +37,7 @@ class channel
 
   public:
     channel() = default;
-    channel(const timeline* tl);
+    channel(const timeline* tl, std::size_t index);
     channel(std::deque<std::unique_ptr<clip>>&& clips);
     ~channel();
 
@@ -49,11 +49,14 @@ class channel
     std::deque<std::unique_ptr<clip>>& get_clips();
     const std::deque<std::unique_ptr<clip>>& get_clips() const;
     milliseconds get_duration() const { return lenght; }
+    std::size_t get_index() const { return index; }
 
   private:
     friend class timeline;
 
     bool add_clip(const std::shared_ptr<video>& vid, const milliseconds& at);
+    bool add_clip(const std::shared_ptr<video>& vid, const milliseconds& at,
+	const milliseconds& startOffset, const milliseconds& endOffset);
     bool append_clip(const std::shared_ptr<video>& vid);
     void move_clip(std::size_t index, const milliseconds& to);
     void seek(const milliseconds& ts);
@@ -79,6 +82,7 @@ class channel
     PaStream* audioStream;
 
     const timeline* tl;
+    std::size_t index;
 
   private:
     void stop();

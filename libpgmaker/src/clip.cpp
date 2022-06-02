@@ -18,15 +18,17 @@ clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt
     open_input(vid->get_info().path);
 }
 
-clip::clip(const std::string& name, const milliseconds& startsAt,
+clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
            const milliseconds& startOffset, const milliseconds& endOffset):
-    vid(),
+    vid(vid),
     name(name), startsAt(startsAt), startOffset(startOffset),
     endOffset(endOffset), width{}, height{},
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
     swsCtx{}, vidTimebase{}, audioTimebase{}
 {
+    assert(vid);
+    open_input(vid->get_info().path);
 }
 void clip::assign_video(const std::shared_ptr<video>& vid)
 {

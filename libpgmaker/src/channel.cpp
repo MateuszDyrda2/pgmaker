@@ -11,12 +11,12 @@
 namespace libpgmaker {
 using namespace std;
 using namespace chrono_literals;
-channel::channel(const timeline* tl):
+channel::channel(const timeline* tl, std::size_t index):
     currentClip{ clips.end() }, prevFrame{},
     nextFrame{}, stopped{ true }, paused{ false },
     tl(tl), audioStream{}, lenght(0),
     videoPacketQueue(64), audioPacketQueue(64),
-    frameQueue(64)
+    frameQueue(64), index(index)
 {
     silentBuffer.resize(NB_CHANNELS * NB_FRAMES, 0.f);
     audioBuffer.resize(NB_CHANNELS * NB_FRAMES);
@@ -46,6 +46,14 @@ channel::~channel()
 bool channel::add_clip(const shared_ptr<video>& vid, const chrono::milliseconds& at)
 {
     clips.emplace_back(make_unique<clip>(vid, at));
+    currentClip = clips.begin();
+    recalculate_lenght();
+    return true;
+}
+bool channel::add_clip(const std::shared_ptr<video>& vid, const milliseconds& at,
+                       const milliseconds& startOffset, const milliseconds& endOffset)
+{
+    clips.emplace_back(make_unique<clip>(vid, at, startOffset, endOffset));
     currentClip = clips.begin();
     recalculate_lenght();
     return true;

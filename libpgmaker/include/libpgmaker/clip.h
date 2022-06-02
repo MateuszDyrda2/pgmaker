@@ -17,7 +17,7 @@ class clip
   public:
     clip() = default;
     clip(const std::shared_ptr<video>& vid, milliseconds startsAt);
-    clip(const std::string& name, const milliseconds& startsAt,
+    clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
          const milliseconds& startOffset, const milliseconds& endOffset);
     ~clip();
 

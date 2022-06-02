@@ -46,7 +46,7 @@ add_executable(pgmaker
 	src/ctimeline.cpp
 	src/cplayback.cpp
 	src/cnode_editor.cpp
-	src/serializer.cpp
+	src/project.cpp
 )
 
 target_link_libraries(pgmaker

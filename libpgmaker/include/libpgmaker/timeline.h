@@ -54,6 +54,8 @@ class timeline
      */
     frame* next_frame();
     bool add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at);
+	bool add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at, 
+	const milliseconds& startOffset, const milliseconds& endOffset);
     void append_clip(std::size_t ch, const std::shared_ptr<video>& vid);
     void move_clip(std::size_t ch, std::size_t cl, const milliseconds& to);
     /** @brief Set the channel to be paused / unpaused

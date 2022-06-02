@@ -23,11 +23,11 @@ timeline& timeline::operator=(timeline&& other) noexcept
 {
     if(this != &other)
     {
-		paused = other.paused;
-		settings = other.settings;
-		ts = milliseconds(0);
-		tsChecked = time_point();
-		channels = std::move(other.channels);
+        paused    = other.paused;
+        settings  = other.settings;
+        ts        = milliseconds(0);
+        tsChecked = time_point();
+        channels  = std::move(other.channels);
     }
     return *this;
 }
@@ -37,7 +37,7 @@ timeline::~timeline()
 }
 channel* timeline::add_channel()
 {
-    return channels.emplace_back(make_unique<channel>(this)).get();
+    return channels.emplace_back(make_unique<channel>(this, channels.size())).get();
 }
 void timeline::remove_channel(std::size_t index)
 {
@@ -196,6 +196,16 @@ bool timeline::add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const
     assert(ch < channels.size());
     stop();
     auto res = channels[ch]->add_clip(vid, at);
+    start();
+    return res;
+}
+
+bool timeline::add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at,
+                        const milliseconds& startOffset, const milliseconds& endOffset)
+{
+    assert(ch < channels.size());
+    stop();
+    auto res = channels[ch]->add_clip(vid, at, startOffset, endOffset);
     start();
     return res;
 }

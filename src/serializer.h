@@ -1,6 +1,7 @@
 #pragma once
 
 #include <libpgmaker/timeline.h>
+#include "video_manager.h"
 
 #include <nlohmann/json.hpp>
 
@@ -10,7 +11,7 @@ namespace libpgmaker {
 using json = nlohmann::json;
 struct serializer
 {
-    const std::vector<std::shared_ptr<libpgmaker::video>>& videos;
+    const video_manager& videos;
     const libpgmaker::timeline& tl;
 };
 struct deserializer

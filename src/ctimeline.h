@@ -7,10 +7,7 @@
 class ctimeline : public window_base
 {
   public:
-    ctimeline(libpgmaker::timeline& tl);
+    ctimeline();
     ~ctimeline();
     void draw() override;
-
-  private:
-    libpgmaker::timeline& tl;
 };

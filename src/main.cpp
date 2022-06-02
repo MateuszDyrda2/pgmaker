@@ -10,6 +10,7 @@
 #include "ctimeline.h"
 #include "cvideos.h"
 
+#include "project.h"
 #include <nfd.h>
 
 #include <iostream>
@@ -71,15 +72,11 @@ int main()
 
     NFD_Init();
 
-    timeline tl(project_settings{});
-    auto ch = tl.add_channel();
-    std::vector<std::shared_ptr<video>> videos;
-
-    cmain_menu menu(videos, tl);
-    cvideos videoWindow(videos);
+    cmain_menu menu;
+    cvideos videoWindow;
     cproperties propertyWindow;
-    ctimeline timelineWindow(tl);
-    cplayback playbackWindow(tl);
+    ctimeline timelineWindow;
+    cplayback playbackWindow;
     cnode_editor nodeEditorWindow;
 
     while(!glfwWindowShouldClose(window))
@@ -92,7 +89,8 @@ int main()
         ////
         menu.draw();
         ////
-        create_main_dockspace(videoWindow, propertyWindow, timelineWindow, playbackWindow, nodeEditorWindow);
+        if(project_manager::get_current_project())
+            create_main_dockspace(videoWindow, propertyWindow, timelineWindow, playbackWindow, nodeEditorWindow);
         ////
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

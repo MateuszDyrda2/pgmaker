@@ -10,10 +10,7 @@
 class cvideos : public window_base
 {
   public:
-    cvideos(std::vector<std::shared_ptr<libpgmaker::video>>& videos);
+    cvideos();
     ~cvideos();
     void draw() override;
-
-  private:
-    std::vector<std::shared_ptr<libpgmaker::video>>& videos;
 };

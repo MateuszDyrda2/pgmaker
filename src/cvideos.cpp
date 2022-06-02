@@ -1,7 +1,6 @@
 #include "cvideos.h"
 
-cvideos::cvideos(std::vector<std::shared_ptr<libpgmaker::video>>& videos):
-    videos(videos)
+cvideos::cvideos()
 {
 }
 cvideos::~cvideos()
@@ -9,24 +8,22 @@ cvideos::~cvideos()
 }
 void cvideos::draw()
 {
+    auto proj          = project_manager::get_current_project();
+    const auto& videos = proj->get_videos();
     ImGui::Begin("Videos");
     {
-        for(std::size_t i = 0; i < videos.size(); ++i)
+        std::size_t line = 0;
+        for(const auto& [name, vid] : videos)
         {
-            if((i % 3) != 0)
+            if((line % 2) != 0) ImGui::SameLine(0.f);
+
+            if(ImGui::ImageButton(reinterpret_cast<ImTextureID>(vid->get_texture()), ImVec2(106.f, 60.f)))
             {
-                ImGui::SameLine(0.f);
-            }
-            if(ImGui::ImageButton(reinterpret_cast<ImTextureID>(videos[i]->get_texture()),
-                                  ImVec2(106.f, 60.f)))
-            {
-                // selectedVideo = videos[i].get();
             }
             if(ImGui::BeginDragDropSource())
             {
-                ImGui::SetDragDropPayload("demo", &videos[i], sizeof(&videos[i]));
-                ImGui::ImageButton(reinterpret_cast<ImTextureID>(videos[i]->get_texture()),
-                                   ImVec2(106.f, 60.f));
+                ImGui::SetDragDropPayload("demo", &vid, sizeof(&vid));
+                ImGui::ImageButton(reinterpret_cast<ImTextureID>(vid->get_texture()), ImVec2(106.f, 60.f));
                 ImGui::EndDragDropSource();
             }
         }
