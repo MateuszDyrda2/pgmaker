@@ -40,13 +40,15 @@ FetchContent_MakeAvailable(json)
 
 add_executable(pgmaker 
 	src/main.cpp
-	src/cmain_menu.cpp
-	src/cvideos.cpp
-	src/cproperties.cpp
-	src/ctimeline.cpp
-	src/cplayback.cpp
-	src/cnode_editor.cpp
+	src/main_menu_panel.cpp
+	src/videos_panel.cpp
+	src/properties_panel.cpp
+	src/timeline_panel.cpp
+	src/playback_panel.cpp
+	src/node_editor_panel.cpp
 	src/project.cpp
+	src/main_application.cpp
+	src/welcome_screen.cpp
 )
 
 target_link_libraries(pgmaker

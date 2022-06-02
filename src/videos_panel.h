@@ -1,16 +1,16 @@
 #pragma once
 
-#include "window_base.h"
+#include "panel.h"
 
 #include <memory>
 #include <vector>
 
 #include <libpgmaker/video_reader.h>
 
-class cvideos : public window_base
+class videos_panel : public panel
 {
   public:
-    cvideos();
-    ~cvideos();
+    videos_panel();
+    ~videos_panel();
     void draw() override;
 };

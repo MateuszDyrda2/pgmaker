@@ -3,31 +3,17 @@
 
 #include <glad/glad.h>
 
-#include "cmain_menu.h"
-#include "cnode_editor.h"
-#include "cplayback.h"
-#include "cproperties.h"
-#include "ctimeline.h"
-#include "cvideos.h"
+#include "command_handler.h"
+#include "main_application.h"
+#include "welcome_screen.h"
 
-#include "project.h"
 #include <nfd.h>
 
 #include <iostream>
 #include <utility>
 #include <vector>
 
-using namespace libpgmaker;
-static void create_main_dockspace(cvideos& videoWindow,
-                                  cproperties& propertyWindow,
-                                  ctimeline& timelineWindow,
-                                  cplayback& playbackWindow,
-                                  cnode_editor& nodeEditorWindow);
-static void initialize_layout(ImGuiID dockspaceId);
-
 static std::pair<int, int> windowSize{ 1920, 1080 };
-static video* selectedVideo = nullptr;
-
 int main()
 {
     if(!glfwInit())
@@ -71,26 +57,81 @@ int main()
     ImGui::StyleColorsDark();
 
     NFD_Init();
+    std::unique_ptr<application_base> application =
+        std::make_unique<welcome_screen>();
 
-    cmain_menu menu;
-    cvideos videoWindow;
-    cproperties propertyWindow;
-    ctimeline timelineWindow;
-    cplayback playbackWindow;
-    cnode_editor nodeEditorWindow;
+    bool shouldRun = true;
+    command_handler::listen(
+        "StartApplication",
+        [&]() { application = std::make_unique<main_application>(); });
+
+    command_handler::listen(
+        "ExitApplication",
+        [&]() { shouldRun = false; });
+
+    command_handler::listen(
+        "CreateProject",
+        []() {
+            nfdchar_t* outPath;
+            nfdnfilteritem_t a = { "PGMaker projects", "pgproj" };
+            auto result        = NFD_SaveDialog(&outPath, &a, 1, NULL, "NewProject.pgproj");
+            if(result == NFD_OKAY)
+            {
+                try
+                {
+                    project_manager::create_project(outPath);
+                }
+                catch(const std::runtime_error& err)
+                {
+                    std::cerr << err.what();
+                }
+
+                NFD_FreePath(outPath);
+            }
+        });
+    command_handler::listen(
+        "LoadProject",
+        []() {
+            nfdchar_t* outPath;
+            nfdnfilteritem_t a = { "PGMaker projects", "pgproj" };
+            auto result        = NFD_OpenDialog(&outPath, &a, 1, 0);
+            if(result == NFD_OKAY)
+            {
+                try
+                {
+                    project_manager::load_project(outPath);
+                }
+                catch(const std::runtime_error& err)
+                {
+                    std::cerr << err.what();
+                }
+                NFD_FreePath(outPath);
+            }
+        });
+    command_handler::listen(
+        "OpenVideo",
+        []() {
+            auto proj = project_manager::get_current_project();
+            if(!proj) return;
+            nfdchar_t* outPath;
+            auto result = NFD_OpenDialog(&outPath, NULL, 0, NULL);
+            if(result == NFD_OKAY)
+            {
+                proj->load_video(outPath);
+                NFD_FreePath(outPath);
+            }
+        });
 
     while(!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-
+        command_handler::update();
+        if(!shouldRun) break;
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ////
-        menu.draw();
-        ////
-        if(project_manager::get_current_project())
-            create_main_dockspace(videoWindow, propertyWindow, timelineWindow, playbackWindow, nodeEditorWindow);
+        application->update();
         ////
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -105,67 +146,4 @@ int main()
 
     glfwDestroyWindow(window);
     return 0;
-}
-void create_main_dockspace(cvideos& videoWindow,
-                           cproperties& propertyWindow,
-                           ctimeline& timelineWindow,
-                           cplayback& playbackWindow,
-                           cnode_editor& nodeEditorWindow)
-{
-    ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
-    ImGuiWindowFlags windowFlags      = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-    ////
-    const auto vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(vp->WorkPos);
-    ImGui::SetNextWindowSize(vp->WorkSize);
-    ImGui::SetNextWindowViewport(vp->ID);
-    windowFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-    windowFlags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    ////
-    if(dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
-    {
-        windowFlags |= ImGuiWindowFlags_NoBackground;
-    }
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
-
-    ImGui::Begin("MainDockSpace", nullptr, windowFlags);
-    {
-        ImGui::PopStyleVar(3);
-        auto dockspaceId = ImGui::GetID("MyDockspace");
-        if(ImGui::DockBuilderGetNode(dockspaceId) == NULL)
-        {
-            initialize_layout(dockspaceId);
-        }
-        else
-        {
-            ImGui::DockSpace(dockspaceId, ImVec2(0, 0), dockspaceFlags);
-
-            timelineWindow.draw();
-            videoWindow.draw();
-            propertyWindow.draw();
-            nodeEditorWindow.draw();
-            playbackWindow.draw();
-        }
-    }
-    ImGui::End();
-}
-void initialize_layout(ImGuiID dockspaceId)
-{
-    ImGui::DockBuilderGetNode(dockspaceId);
-    ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
-    ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
-
-    auto dockMainId  = dockspaceId;
-    auto dockIdDown  = ImGui::DockBuilderSplitNode(dockMainId, ImGuiDir_Down, 0.2f, NULL, &dockMainId);
-    auto dockIdLeft  = ImGui::DockBuilderSplitNode(dockMainId, ImGuiDir_Left, 0.2f, NULL, &dockMainId);
-    auto dockIdRight = ImGui::DockBuilderSplitNode(dockMainId, ImGuiDir_Right, 0.25f, NULL, &dockMainId);
-
-    ImGui::DockBuilderDockWindow("Timeline", dockIdDown);
-    ImGui::DockBuilderDockWindow("Videos", dockIdLeft);
-    ImGui::DockBuilderDockWindow("Properties", dockIdRight);
-    ImGui::DockBuilderDockWindow("Playback", dockMainId);
-    ImGui::DockBuilderDockWindow("NodeEditor", dockMainId);
-    ImGui::DockBuilderFinish(dockspaceId);
 }

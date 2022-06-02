@@ -10,9 +10,9 @@
 
 #include "project.h"
 
-class window_base
+class panel
 {
   public:
-    virtual ~window_base() = default;
-    virtual void draw()    = 0;
+    virtual ~panel()    = default;
+    virtual void draw() = 0;
 };

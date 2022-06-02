@@ -1,7 +1,7 @@
-#include "cplayback.h"
+#include "playback_panel.h"
 
 using namespace libpgmaker;
-cplayback::cplayback()
+playback_panel::playback_panel()
 {
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -13,10 +13,10 @@ cplayback::cplayback()
                  textureSize.first, textureSize.second, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, 0);
 }
-cplayback::~cplayback()
+playback_panel::~playback_panel()
 {
 }
-void cplayback::draw()
+void playback_panel::draw()
 {
     auto proj = project_manager::get_current_project();
     auto& tl  = proj->get_timeline();

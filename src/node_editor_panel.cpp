@@ -1,12 +1,13 @@
-#include "cnode_editor.h"
-cnode_editor::cnode_editor()
+#include "node_editor_panel.h"
+
+node_editor_panel::node_editor_panel()
 {
     blockEditor = std::make_unique<BlockEditor>(300.f, 200.f, 5);
 }
-cnode_editor::~cnode_editor()
+node_editor_panel::~node_editor_panel()
 {
 }
-void cnode_editor::draw()
+void node_editor_panel::draw()
 {
     if(ImGui::Begin("NodeEditor"))
     {

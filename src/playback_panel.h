@@ -1,16 +1,16 @@
 #pragma once
 
-#include "window_base.h"
+#include "panel.h"
 
 #include <libpgmaker/timeline.h>
 
 #include <utility>
 
-class cplayback : public window_base
+class playback_panel : public panel
 {
   public:
-    cplayback();
-    ~cplayback();
+    playback_panel();
+    ~playback_panel();
     void draw() override;
 
   private:

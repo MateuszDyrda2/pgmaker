@@ -1,12 +1,12 @@
-#include "cvideos.h"
+#include "videos_panel.h"
 
-cvideos::cvideos()
+videos_panel::videos_panel()
 {
 }
-cvideos::~cvideos()
+videos_panel::~videos_panel()
 {
 }
-void cvideos::draw()
+void videos_panel::draw()
 {
     auto proj          = project_manager::get_current_project();
     const auto& videos = proj->get_videos();

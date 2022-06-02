@@ -1,13 +1,13 @@
-#include "ctimeline.h"
+#include "timeline_panel.h"
 
 using namespace libpgmaker;
-ctimeline::ctimeline()
+timeline_panel::timeline_panel()
 {
 }
-ctimeline::~ctimeline()
+timeline_panel::~timeline_panel()
 {
 }
-void ctimeline::draw()
+void timeline_panel::draw()
 {
     auto proj = project_manager::get_current_project();
     auto& tl  = proj->get_timeline();
