@@ -5,7 +5,8 @@ packet::packet(class clip* owner, AVPacket* payload):
     owner(owner), payload(payload) { }
 packet::~packet()
 {
-    free();
+    if(payload)
+        av_packet_free(&payload);
 }
 packet::packet(packet&& other) noexcept:
     owner(other.owner), payload(other.payload)
@@ -16,18 +17,13 @@ packet& packet::operator=(packet&& other) noexcept
 {
     if(this != &other)
     {
-        free();
+        if(payload)
+            av_packet_free(&payload);
         owner         = other.owner;
         payload       = other.payload;
         other.payload = nullptr;
     }
     return *this;
-}
-
-void packet::free()
-{
-    if(payload)
-        av_packet_free(&payload);
 }
 void packet::unref()
 {

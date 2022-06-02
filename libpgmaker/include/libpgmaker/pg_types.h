@@ -37,7 +37,6 @@ struct packet
     packet(const packet& other) = delete;
     packet(packet&& other) noexcept;
     packet& operator=(packet&& other) noexcept;
-    void free();
     void unref();
 };
 } // namespace libpgmaker

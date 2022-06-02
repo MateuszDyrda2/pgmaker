@@ -28,7 +28,7 @@ project::project(const std::filesystem::path& path,
                  const std::filesystem::path& tmpDirectory,
                  const std::filesystem::path& assetDirectory):
     videos(),
-    tl(project_settings{ .size = { 1920, 1080 }, .framerate = 60 }),
+    tl(project_settings{ { 1920, 1080 },  60 }),
     path(path),
     workingDirectory(workingDirectory),
     tmpDirectory(tmpDirectory), assetDirectory(assetDirectory)
@@ -38,12 +38,12 @@ project::project(const std::filesystem::path& path,
     {
         throw std::runtime_error("Project file corrupted");
     }
-    name = path.stem();
+    name = path.stem().string();
     for(const auto& entry : std::filesystem::directory_iterator{ assetDirectory })
     {
         if(entry.is_regular_file())
         {
-            auto vid = video_reader::load_file(entry.path())
+            auto vid = video_reader::load_file(entry.path().string())
                            .load_metadata()
                            .load_thumbnail()
                            .get();
@@ -85,15 +85,15 @@ project::project(const std::filesystem::path& path,
 }
 project::project(const std::filesystem::path& path):
     videos(),
-    tl(project_settings{ .size = { 1920, 1080 }, .framerate = 60 }),
+    tl(project_settings{{ 1920, 1080 }, 60 }),
     path(path)
 {
     workingDirectory = path.parent_path();
     tmpDirectory     = workingDirectory / "tmp";
-    assetDirectory   = assetDirectory / "assets";
+    assetDirectory   = workingDirectory / "assets";
     std::filesystem::create_directory(tmpDirectory);
     std::filesystem::create_directory(assetDirectory);
-    name = path.stem();
+    name = path.stem().string();
 }
 project::~project()
 {
@@ -122,7 +122,7 @@ void project::load_video(const std::string& path)
     std::shared_ptr<video> vid;
     try
     {
-        vid = video_reader::load_file(dir)
+        vid = video_reader::load_file(dir.string())
                   .load_metadata()
                   .load_thumbnail()
                   .get();

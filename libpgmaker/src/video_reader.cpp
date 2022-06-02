@@ -35,8 +35,10 @@ video_reader::video_handle video_reader::load_file(const std::string& path)
 }
 video_reader::video_handle::video_handle(AVFormatContext* ctx, const std::string& path):
     pFormatContext(ctx), pCodecContext{}, vsIndex{ -1 },
-    info{ .path = path }, thumbnail{}
-{ }
+    info{}, thumbnail{}
+{ 
+    info.path = path;
+}
 video_reader::video_handle::~video_handle()
 {
     if(pCodecContext)
@@ -98,7 +100,7 @@ video_reader::video_handle& video_reader::video_handle::load_metadata()
     info.codecId     = pCodecContext->codec_id;
     info.bitrate     = pCodecContext->bit_rate;
     fs::path p       = info.path;
-    info.name        = p.stem();
+    info.name        = p.stem().string();
 
     return *this;
 }

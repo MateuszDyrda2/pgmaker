@@ -7,7 +7,12 @@
 #include "main_application.h"
 #include "welcome_screen.h"
 
-#include <nfd.h>
+#if defined(WIN32)
+    #define NFD_FILTER_ITEM nfdu8filteritem_t
+#else
+    #define NFD_FILTER_ITEM nfdnfilteritem_t
+#endif
+#include <nfd.hpp>
 
 #include <iostream>
 #include <utility>
@@ -72,40 +77,37 @@ int main()
     command_handler::listen(
         "CreateProject",
         []() {
-            nfdchar_t* outPath;
-            nfdnfilteritem_t a = { "PGMaker projects", "pgproj" };
-            auto result        = NFD_SaveDialog(&outPath, &a, 1, NULL, "NewProject.pgproj");
+            NFD::UniquePath outPath;
+            NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
+            auto result = NFD::SaveDialog(outPath, &a, 1, NULL, "NewProject.pgproj");
             if(result == NFD_OKAY)
             {
                 try
                 {
-                    project_manager::create_project(outPath);
+                    project_manager::create_project(outPath.get());
                 }
                 catch(const std::runtime_error& err)
                 {
                     std::cerr << err.what();
                 }
-
-                NFD_FreePath(outPath);
             }
         });
     command_handler::listen(
         "LoadProject",
         []() {
-            nfdchar_t* outPath;
-            nfdnfilteritem_t a = { "PGMaker projects", "pgproj" };
-            auto result        = NFD_OpenDialog(&outPath, &a, 1, 0);
+            NFD::UniquePath outPath;
+            NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
+            auto result        = NFD::OpenDialog(outPath, &a, 1, 0);
             if(result == NFD_OKAY)
             {
                 try
                 {
-                    project_manager::load_project(outPath);
+                    project_manager::load_project(outPath.get());
                 }
                 catch(const std::runtime_error& err)
                 {
                     std::cerr << err.what();
                 }
-                NFD_FreePath(outPath);
             }
         });
     command_handler::listen(
@@ -113,12 +115,11 @@ int main()
         []() {
             auto proj = project_manager::get_current_project();
             if(!proj) return;
-            nfdchar_t* outPath;
-            auto result = NFD_OpenDialog(&outPath, NULL, 0, NULL);
+            NFD::UniquePath outPath;
+            auto result = NFD::OpenDialog(outPath, NULL, 0, NULL);
             if(result == NFD_OKAY)
             {
-                proj->load_video(outPath);
-                NFD_FreePath(outPath);
+                proj->load_video(outPath.get());
             }
         });
     command_handler::listen(
