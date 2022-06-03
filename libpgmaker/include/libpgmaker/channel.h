@@ -50,6 +50,7 @@ class channel
     const std::deque<std::unique_ptr<clip>>& get_clips() const;
     milliseconds get_duration() const { return lenght; }
     std::size_t get_index() const { return index; }
+    std::size_t get_id() const { return channelId; }
 
   private:
     friend class timeline;
@@ -83,6 +84,7 @@ class channel
 
     const timeline* tl;
     std::size_t index;
+    std::size_t channelId;
 
   private:
     void stop();

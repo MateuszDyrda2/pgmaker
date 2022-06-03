@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <libpgmaker/clip.h>
+#include <libpgmaker/id_generator.h>
 
 #include <cassert>
 #include <stdexcept>
@@ -8,11 +9,12 @@
 namespace libpgmaker {
 using namespace std;
 clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt):
-    vid(vid), name(vid->get_info().name), startOffset{}, endOffset{}, startsAt(startsAt),
+    vid(vid),
+    name(vid->get_info().name), startOffset{}, endOffset{}, startsAt(startsAt),
     width{}, height{},
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
-    swsCtx{}, vidTimebase{}, audioTimebase{}
+    swsCtx{}, vidTimebase{}, audioTimebase{}, clipId(id_generator::get_next())
 {
     assert(vid);
     open_input(vid->get_info().path);
@@ -26,7 +28,7 @@ clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
     endOffset(endOffset), width{}, height{},
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
-    swsCtx{}, vidTimebase{}, audioTimebase{}
+    swsCtx{}, vidTimebase{}, audioTimebase{}, clipId(id_generator::get_next())
 {
     assert(vid);
     open_input(vid->get_info().path);

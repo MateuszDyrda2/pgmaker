@@ -71,7 +71,6 @@ void timeline_panel::draw_timeline(libpgmaker::timeline& tl)
 
         /////////////////////////////////////////////
 
-        std::size_t index = 0;
         for(const auto& ch : tl.get_channels())
         {
             draw_channel(tl, ch, xmin, xmax, canvasPos, canvasSize, drawList);
@@ -98,7 +97,7 @@ void timeline_panel::draw_channel(timeline& tl, const std::unique_ptr<channel>& 
     if(ImGui::Button(channName.c_str(), { xmin - canvasPos.x, channelHeight }))
         ;
     //
-    ImGui::PushID(index);
+    ImGui::PushID(ch->get_id());
     ImGui::SetCursorPos(ImVec2(xmin - canvasPos.x, (channelHeight + channelMargin) * index));
     ImGui::InvisibleButton("", ImVec2(xmax - xmin, channelHeight));
     float spacing = index * (channelHeight + channelMargin);
@@ -121,12 +120,11 @@ void timeline_panel::draw_channel(timeline& tl, const std::unique_ptr<channel>& 
     }
 
     ImGui::SetItemAllowOverlap();
-    static bool wasMoved          = false;
-    static std::size_t movedIndex = 0;
-    std::size_t j                 = 0;
+    std::size_t j = 0;
     for(const auto& cl : ch->get_clips())
     {
         draw_clip(tl, cl, index, j, xmin, xmax, canvasPos, canvasSize, drawList);
+        ++j;
     }
     ImGui::PopID();
 }
@@ -138,7 +136,8 @@ void timeline_panel::draw_clip(libpgmaker::timeline& tl,
                                ImVec2 canvasPos, ImVec2 canvasSize,
                                ImDrawList* drawList)
 {
-    ImGui::PushID(tl.get_channels().size() + j);
+    ImGui::PushID(cl->get_id());
+
     auto starts    = cl->get_starts_at().count();
     auto ends      = starts + cl->get_duration().count();
     auto stDiv     = starts / double(timemax);
@@ -153,12 +152,12 @@ void timeline_panel::draw_clip(libpgmaker::timeline& tl,
     if(isItemActive && isMouseDragging)
     {
         wasMoved   = true;
-        movedIndex = j;
+        movedIndex = cl->get_id();
         auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
         clipXMin += delta.x;
         clipXMax += delta.x;
     }
-    else if(wasMoved && !isMouseDragging && movedIndex == j)
+    else if(wasMoved && !isMouseDragging && movedIndex == cl->get_id())
     {
         wasMoved   = false;
         auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
@@ -171,6 +170,5 @@ void timeline_panel::draw_clip(libpgmaker::timeline& tl,
         { float(clipXMin), canvasPos.y + ((channelHeight + channelMargin) * i) },
         { float(clipXMax), canvasPos.y + ((channelHeight + channelMargin) * i) + channelHeight },
         0xFF0000AA, 2.5f);
-    ++j;
     ImGui::PopID();
 }

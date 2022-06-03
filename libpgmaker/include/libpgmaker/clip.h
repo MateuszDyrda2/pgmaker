@@ -46,10 +46,12 @@ class clip
     milliseconds video_convert_pts(std::int64_t pts) const;
     std::int64_t video_reconvert_pts(const milliseconds& pts) const;
     const std::string& get_name() const { return vid->get_info().name; }
+    std::uint64_t get_id() const { return clipId; }
 
   private:
     std::shared_ptr<video> vid;
     std::string name;
+    std::uint64_t clipId;
     milliseconds startOffset;
     milliseconds endOffset;
     milliseconds startsAt;

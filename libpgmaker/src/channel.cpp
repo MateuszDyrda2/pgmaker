@@ -1,5 +1,6 @@
 #include <libpgmaker/channel.h>
 
+#include <libpgmaker/id_generator.h>
 #include <libpgmaker/timeline.h>
 
 #include <algorithm>
@@ -16,7 +17,7 @@ channel::channel(const timeline* tl, std::size_t index):
     nextFrame{}, stopped{ true }, paused{ false },
     tl(tl), audioStream{}, lenght(0),
     videoPacketQueue(64), audioPacketQueue(64),
-    frameQueue(64), index(index)
+    frameQueue(64), index(index), channelId(id_generator::get_next())
 {
     silentBuffer.resize(NB_CHANNELS * NB_FRAMES, 0.f);
     audioBuffer.resize(NB_CHANNELS * NB_FRAMES);
@@ -26,7 +27,7 @@ channel::channel(std::deque<std::unique_ptr<clip>>&& clips):
     clips{ std::move(clips) }, currentClip{ clips.end() },
     prevFrame{}, nextFrame{}, stopped{ true }, paused{ false },
     audioStream{}, lenght(0), videoPacketQueue{ 64 },
-    audioPacketQueue(64), frameQueue(64)
+    audioPacketQueue(64), frameQueue(64), channelId(id_generator::get_next())
 {
     silentBuffer.resize(NB_CHANNELS * NB_FRAMES, 0.f);
     audioBuffer.resize(NB_CHANNELS * NB_FRAMES);
