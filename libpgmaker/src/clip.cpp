@@ -16,6 +16,7 @@ clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt
 {
     assert(vid);
     open_input(vid->get_info().path);
+    audioFrame = av_frame_alloc();
 }
 
 clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
@@ -29,6 +30,7 @@ clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
 {
     assert(vid);
     open_input(vid->get_info().path);
+    audioFrame = av_frame_alloc();
 }
 void clip::assign_video(const std::shared_ptr<video>& vid)
 {
@@ -39,6 +41,7 @@ void clip::assign_video(const std::shared_ptr<video>& vid)
 
 clip::~clip()
 {
+    av_frame_free(&audioFrame);
     swr_free(&swrCtx);
     sws_freeContext(swsCtx);
     avcodec_free_context(&pVideoCodecCtx);
@@ -220,11 +223,10 @@ std::size_t clip::get_audio_frame(packet* pPacket, vector<float>& b)
     // may contain multiple frames
     for(;;)
     {
-        AVFrame* frame = av_frame_alloc();
-        if(int response = avcodec_receive_frame(pAudioCodecCtx, frame);
+        //        AVFrame* frame = av_frame_alloc();
+        if(int response = avcodec_receive_frame(pAudioCodecCtx, audioFrame);
            response == AVERROR(EAGAIN) || response == AVERROR_EOF)
         {
-            av_frame_free(&frame);
             break;
         }
         else if(response < 0)
@@ -234,13 +236,13 @@ std::size_t clip::get_audio_frame(packet* pPacket, vector<float>& b)
         float* buffer[] = { ptr };
 
         auto cSamples = swr_convert(swrCtx, (std::uint8_t**)buffer,
-                                    frame->nb_samples,
-                                    const_cast<const std::uint8_t**>(frame->extended_data),
-                                    frame->nb_samples);
+                                    audioFrame->nb_samples,
+                                    const_cast<const std::uint8_t**>(audioFrame->extended_data),
+                                    audioFrame->nb_samples);
         std::advance(ptr, cSamples * nbChannels);
         bSize += cSamples;
 
-        av_frame_free(&frame);
+        av_frame_unref(audioFrame);
     }
 
     return bSize;

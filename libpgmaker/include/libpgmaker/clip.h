@@ -68,6 +68,8 @@ class clip
     std::int64_t vidCurrentStreamPos;
     std::int64_t vidCurrentTs;
 
+    AVFrame* audioFrame;
+
   private:
     friend class channel;
     void open_input(const std::string& path);

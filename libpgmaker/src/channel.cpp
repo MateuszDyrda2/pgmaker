@@ -200,10 +200,6 @@ void channel::decoding_job()
                 {
                     audioPacketQueue.enqueue(std::move(_packet));
                 }
-                else
-                {
-                    _packet.unref();
-                }
             }
             else
             {
