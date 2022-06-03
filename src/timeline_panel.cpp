@@ -1,6 +1,7 @@
 #include "timeline_panel.h"
 
 #include "command_handler.h"
+#include "events.h"
 
 using namespace libpgmaker;
 timeline_panel::timeline_panel()
@@ -28,6 +29,7 @@ timeline_panel::timeline_panel()
         [&tl](command& c) {
             auto&& [index, vid] = *reinterpret_cast<std::pair<std::size_t, std::shared_ptr<video>>*>(c.data);
             tl.append_clip(index, vid);
+            event_handler::fire_event("TimelineClipAppended");
         });
     command_handler::listen(
         "TimelineMoveClip",
