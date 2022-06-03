@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cassert>
 
+#include <glad/glad.h>
+
 namespace libpgmaker {
 using namespace std;
 using namespace chrono_literals;
@@ -33,19 +35,27 @@ timeline& timeline::operator=(timeline&& other) noexcept
 }
 timeline::~timeline()
 {
+    auto s = textures.size();
+    for(size_t i = 0; i < s; ++i)
+    {
+        destroy_texture();
+    }
     drop_audio();
 }
 channel* timeline::add_channel()
 {
+    generate_texture(channels.size());
     return channels.emplace_back(make_unique<channel>(this, channels.size())).get();
 }
 void timeline::remove_channel(std::size_t index)
 {
+    destroy_texture();
     assert(index < channels.size());
     channels.erase(channels.begin() + index);
 }
 void timeline::remove_channel(channel* ch)
 {
+    destroy_texture();
     assert(ch != nullptr);
     auto toEr = find_if(channels.begin(), channels.end(),
                         [&](auto& item) { return item.get() == ch; });
@@ -80,10 +90,10 @@ const channel* timeline::operator[](std::size_t index) const
 {
     return channels[index].get();
 }
-frame* timeline::next_frame()
+std::pair<const std::vector<timeline::texture_t>&, std::size_t> timeline::next_frame()
 {
     if(channels.empty())
-        return nullptr;
+        return { textures, 0 };
 
     if(!paused)
     {
@@ -96,9 +106,17 @@ frame* timeline::next_frame()
     vector<frame*> frames;
     for(auto& ch : channels)
     {
-        frames.push_back(ch->next_frame(ts, paused));
+        // frames.push_back(ch->next_frame(ts, paused));
+        auto frame = ch->next_frame(ts, paused);
+        if(frame) frames.push_back(frame);
     }
-    return frames.front();
+
+    for(size_t index = 0; index < frames.size(); ++index)
+    {
+        texture_for_frame(index, frames[index]);
+    }
+
+    return { textures, frames.size() };
 }
 bool timeline::set_paused(bool value)
 {
@@ -239,5 +257,44 @@ void timeline::start()
         [](auto& ch) {
             ch->start();
         });
+}
+void timeline::texture_for_frame(std::size_t index, frame* f)
+{
+    auto& tex = textures[index];
+    glActiveTexture(GL_TEXTURE0 + index);
+    glBindTexture(GL_TEXTURE_2D, tex.handle);
+    if(f->size != tex.size)
+    {
+        tex.size = f->size;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex.size.first, tex.size.second,
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, f->data.data());
+    }
+    else
+    {
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+                        tex.size.first, tex.size.second, GL_RGBA,
+                        GL_UNSIGNED_BYTE, f->data.data());
+    }
+}
+void timeline::generate_texture(std::size_t index)
+{
+    unsigned int texture;
+    glActiveTexture(GL_TEXTURE0 + index);
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                 size.first, size.second, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    textures.push_back({ texture, size });
+}
+void timeline::destroy_texture()
+{
+    auto tex = textures.back().handle;
+    glDeleteTextures(1, &tex);
+    textures.pop_back();
 }
 } // namespace libpgmaker

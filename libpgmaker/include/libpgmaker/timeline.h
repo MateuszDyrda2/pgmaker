@@ -10,6 +10,15 @@ namespace libpgmaker {
 class timeline
 {
   public:
+    struct texture_t
+    {
+        unsigned int handle;
+        std::pair<unsigned int, unsigned int> size;
+    };
+
+  public:
+    static constexpr std::size_t MAX_FRAMES = 4;
+
     using time_point   = channel::time_point;
     using milliseconds = channel::milliseconds;
     using duration     = channel::duration;
@@ -52,10 +61,10 @@ class timeline
     /** @brief Move playback forward and get the current frame.
      * @return pointer to the requested frame
      */
-    frame* next_frame();
+    std::pair<const std::vector<texture_t>&, std::size_t> next_frame();
     bool add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at);
-	bool add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at, 
-	const milliseconds& startOffset, const milliseconds& endOffset);
+    bool add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at,
+                  const milliseconds& startOffset, const milliseconds& endOffset);
     void append_clip(std::size_t ch, const std::shared_ptr<video>& vid);
     void move_clip(std::size_t ch, std::size_t cl, const milliseconds& to);
     /** @brief Set the channel to be paused / unpaused
@@ -78,6 +87,7 @@ class timeline
     milliseconds get_duration() const;
     /** @return Whether the timeline is paused */
     bool get_paused() const { return paused; }
+    void set_size(const std::pair<unsigned int, unsigned int>& size) { this->size = size; }
 
   private:
     bool paused;
@@ -86,8 +96,17 @@ class timeline
 
     milliseconds ts;
     time_point tsChecked;
+    std::pair<unsigned int, unsigned int> size;
+
+    std::vector<texture_t> textures;
 
   private:
+    void generate_vao();
+    void generate_shaders();
+    void generate_texture(std::size_t index);
+    void texture_for_frame(std::size_t index, frame* f);
+    void destroy_texture();
+
     void initialize_audio();
     void drop_audio();
     void rebuild();

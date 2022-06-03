@@ -4,13 +4,14 @@
 #include <glad/glad.h>
 
 #include "command_handler.h"
+#include "events.h"
 #include "main_application.h"
 #include "welcome_screen.h"
 
 #if defined(WIN32)
-    #define NFD_FILTER_ITEM nfdu8filteritem_t
+#    define NFD_FILTER_ITEM nfdu8filteritem_t
 #else
-    #define NFD_FILTER_ITEM nfdnfilteritem_t
+#    define NFD_FILTER_ITEM nfdnfilteritem_t
 #endif
 #include <nfd.hpp>
 
@@ -44,8 +45,11 @@ int main()
     glfwSwapInterval(1);
 
     glfwSetWindowSizeCallback(window, [](GLFWwindow* window, int width, int height) {
-        windowSize = { width, height };
+        event_handler::fire_event("WindowResize", width, height);
     });
+    event_handler::subscribe("WindowResize", std::function<void(int, int)>([&](int width, int height) {
+                                 windowSize = { width, height };
+                             }));
 
     if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -79,7 +83,7 @@ int main()
         []() {
             NFD::UniquePath outPath;
             NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
-            auto result = NFD::SaveDialog(outPath, &a, 1, NULL, "NewProject.pgproj");
+            auto result       = NFD::SaveDialog(outPath, &a, 1, NULL, "NewProject.pgproj");
             if(result == NFD_OKAY)
             {
                 try
@@ -97,7 +101,7 @@ int main()
         []() {
             NFD::UniquePath outPath;
             NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
-            auto result        = NFD::OpenDialog(outPath, &a, 1, 0);
+            auto result       = NFD::OpenDialog(outPath, &a, 1, 0);
             if(result == NFD_OKAY)
             {
                 try

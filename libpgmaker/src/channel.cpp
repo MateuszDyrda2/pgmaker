@@ -9,6 +9,8 @@
 #include <iostream>
 #include <thread>
 
+#include <glad/glad.h>
+
 namespace libpgmaker {
 using namespace std;
 using namespace chrono_literals;
@@ -95,7 +97,7 @@ frame* channel::next_frame(const duration& timestamp, bool paused)
 {
     if(timestamp > lenght)
     {
-        return nullptr;
+        return 0;
     }
     if(paused) return prevFrame;
     if(!nextFrame)
@@ -398,4 +400,4 @@ void channel::reorder_clips()
                   return lhs->get_starts_at() < rhs->get_starts_at();
               });
 }
-} // namespace libpgmaker
+}

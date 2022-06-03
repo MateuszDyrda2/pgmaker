@@ -3,15 +3,6 @@
 using namespace libpgmaker;
 playback_panel::playback_panel()
 {
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                 textureSize.first, textureSize.second, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, 0);
 }
 playback_panel::~playback_panel()
 {
@@ -33,25 +24,15 @@ void playback_panel::draw()
         ////////////////////////
         auto pos  = ImGui::GetWindowPos();
         auto size = ImGui::GetWindowSize();
+        tl.set_size({ size.x, size.y });
 
-        glBindTexture(GL_TEXTURE_2D, texture);
-        auto frame = tl.next_frame();
-        if(frame)
+        auto&& [textures, nbTextures] = tl.next_frame();
+        for(int it = nbTextures - 1; it >= 0; --it)
         {
-            if(frame->size != textureSize)
-            {
-                textureSize = frame->size;
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureSize.first, textureSize.second,
-                             0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-            }
-            else
-            {
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-                                textureSize.first, textureSize.second, GL_RGBA,
-                                GL_UNSIGNED_BYTE, frame->data.data());
-            }
+            ImGui::Image(
+                reinterpret_cast<ImTextureID>(textures[it].handle),
+                { textures[it].size.first, textures[it].size.second });
         }
-        ImGui::Image(reinterpret_cast<ImTextureID>(texture), size);
         ////////////////////////
         // ImGui::EndChild();
     }
