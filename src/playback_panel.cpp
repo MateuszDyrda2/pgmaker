@@ -27,11 +27,14 @@ void playback_panel::draw()
         tl.set_size({ size.x, size.y });
 
         auto&& [textures, nbTextures] = tl.next_frame();
-        for(int it = nbTextures - 1; it >= 0; --it)
+        while(nbTextures-- > 0)
         {
+            auto& tex = textures[nbTextures];
+            ImGui::SetCursorPos({ (size.x - tex.size.first) * 0.5f,
+                                  (size.y - tex.size.second) * 0.5f });
             ImGui::Image(
-                reinterpret_cast<ImTextureID>(textures[it].handle),
-                { textures[it].size.first, textures[it].size.second });
+                reinterpret_cast<ImTextureID>(textures[nbTextures].handle),
+                { textures[nbTextures].size.first, textures[nbTextures].size.second });
         }
         ////////////////////////
         // ImGui::EndChild();

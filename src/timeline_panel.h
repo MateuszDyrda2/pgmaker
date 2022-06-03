@@ -26,12 +26,14 @@ class timeline_panel : public panel
     void draw_channel(libpgmaker::timeline& tl,
                       const std::unique_ptr<libpgmaker::channel>& ch,
                       float xmin, float xmax,
-                      ImVec2 canvasPos, ImVec2 canvasSize,
+                      ImVec2 channelPos,
+                      ImVec2 canvasPos,
                       ImDrawList* drawList);
     void draw_clip(libpgmaker::timeline& tl, const std::unique_ptr<libpgmaker::clip>& cl,
                    std::size_t i,
                    std::size_t j,
                    float xmin, float xmax,
-                   ImVec2 canvasPos, ImVec2 canvasSize,
+                   ImVec2 channelPos,
+                   ImVec2 canvasPos,
                    ImDrawList* drawList);
 };

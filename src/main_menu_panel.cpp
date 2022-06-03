@@ -1,10 +1,16 @@
 #include "main_menu_panel.h"
 
 #include "command_handler.h"
-#include <nfd.h>
+#include <nfd.hpp>
 
 #include <fstream>
 #include <iostream>
+
+#if defined(WIN32)
+#    define NFD_FILTER_ITEM nfdu8filteritem_t
+#else
+#    define NFD_FILTER_ITEM nfdnfilteritem_t
+#endif
 
 using namespace libpgmaker;
 main_menu_panel::main_menu_panel()
@@ -21,23 +27,40 @@ void main_menu_panel::draw()
         {
             if(ImGui::MenuItem("Open Video"))
             {
-                command_handler::send("OpenVideo");
+                NFD::UniquePath outPath;
+                auto result = NFD::OpenDialog(outPath, NULL, 0, NULL);
+                if(result == NFD_OKAY)
+                {
+                    command_handler::send({ "OpenVideo", new std::string(outPath.get()) });
+                }
             };
             if(ImGui::MenuItem("Create project"))
             {
-                command_handler::send("CreateProject");
+                NFD::UniquePath outPath;
+                NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
+                auto result       = NFD::SaveDialog(outPath, &a, 1, NULL, "NewProject.pgproj");
+                if(result == NFD_OKAY)
+                {
+                    command_handler::send({ "CreateProject", new std::string(outPath.get()) });
+                }
             }
             if(ImGui::MenuItem("Save project"))
             {
-                command_handler::send("SaveProject");
+                command_handler::send({ "SaveProject" });
             }
             if(ImGui::MenuItem("Load project"))
             {
-                command_handler::send("LoadProject");
+                NFD::UniquePath outPath;
+                NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
+                auto result       = NFD::OpenDialog(outPath, &a, 1, 0);
+                if(result == NFD_OKAY)
+                {
+                    command_handler::send({ "LoadProject", new std::string(outPath.get()) });
+                }
             }
             if(ImGui::MenuItem("Exit"))
             {
-                command_handler::send("ExitApplication");
+                command_handler::send({ "ExitApplication" });
             }
             ImGui::EndMenu();
         }

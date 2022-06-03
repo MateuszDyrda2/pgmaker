@@ -70,25 +70,23 @@ int main()
         std::make_unique<welcome_screen>();
 
     bool shouldRun = true;
+
     command_handler::listen(
         "StartApplication",
-        [&]() { application = std::make_unique<main_application>(); });
+        [&](command& c) { application = std::make_unique<main_application>(); });
 
     command_handler::listen(
         "ExitApplication",
-        [&]() { shouldRun = false; });
+        [&](command& c) { shouldRun = false; });
 
     command_handler::listen(
         "CreateProject",
-        []() {
-            NFD::UniquePath outPath;
-            NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
-            auto result       = NFD::SaveDialog(outPath, &a, 1, NULL, "NewProject.pgproj");
-            if(result == NFD_OKAY)
+        [](command& c) {
             {
+                auto path = *reinterpret_cast<std::string*>(c.data);
                 try
                 {
-                    project_manager::create_project(outPath.get());
+                    project_manager::create_project(path);
                 }
                 catch(const std::runtime_error& err)
                 {
@@ -98,42 +96,32 @@ int main()
         });
     command_handler::listen(
         "LoadProject",
-        []() {
-            NFD::UniquePath outPath;
-            NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
-            auto result       = NFD::OpenDialog(outPath, &a, 1, 0);
-            if(result == NFD_OKAY)
+        [](command& c) {
+            auto& path = *reinterpret_cast<std::string*>(c.data);
+            try
             {
-                try
-                {
-                    project_manager::load_project(outPath.get());
-                }
-                catch(const std::runtime_error& err)
-                {
-                    std::cerr << err.what();
-                }
+                project_manager::load_project(path);
+            }
+            catch(const std::runtime_error& err)
+            {
+                std::cerr << err.what();
             }
         });
     command_handler::listen(
         "OpenVideo",
-        []() {
+        [](command& c) {
             auto proj = project_manager::get_current_project();
             if(!proj) return;
-            NFD::UniquePath outPath;
-            auto result = NFD::OpenDialog(outPath, NULL, 0, NULL);
-            if(result == NFD_OKAY)
-            {
-                proj->load_video(outPath.get());
-            }
+            auto& path = *reinterpret_cast<std::string*>(c.data);
+            proj->load_video(path);
         });
     command_handler::listen(
         "SaveProject",
-        []() {
+        [](command& c) {
             auto proj = project_manager::get_current_project();
             if(!proj) return;
             proj->save();
         });
-
     while(!glfwWindowShouldClose(window))
     {
         glfwPollEvents();

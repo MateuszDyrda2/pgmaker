@@ -6,6 +6,12 @@
 #include <iostream>
 #include <nfd.hpp>
 
+#if defined(WIN32)
+#    define NFD_FILTER_ITEM nfdu8filteritem_t
+#else
+#    define NFD_FILTER_ITEM nfdnfilteritem_t
+#endif
+
 welcome_screen::welcome_screen()
 {
 }
@@ -24,19 +30,31 @@ void welcome_screen::update()
     {
         if(ImGui::Button("Create new project"))
         {
-            command_handler::send("CreateProject");
-            command_handler::send("StartApplication");
+            NFD::UniquePath outPath;
+            NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
+            auto result       = NFD::SaveDialog(outPath, &a, 1, NULL, "NewProject.pgproj");
+            if(result == NFD_OKAY)
+            {
+                command_handler::send({ "CreateProject", new std::string(outPath.get()) });
+                command_handler::send({ "StartApplication" });
+            }
             ImGui::CloseCurrentPopup();
         }
         if(ImGui::Button("Load project"))
         {
-            command_handler::send("LoadProject");
-            command_handler::send("StartApplication");
+            NFD::UniquePath outPath;
+            NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
+            auto result       = NFD::OpenDialog(outPath, &a, 1, 0);
+            if(result == NFD_OKAY)
+            {
+                command_handler::send({ "LoadProject", new std::string(outPath.get()) });
+                command_handler::send({ "StartApplication" });
+            }
             ImGui::CloseCurrentPopup();
         }
         if(ImGui::Button("Exit"))
         {
-            command_handler::send("ExitApplication");
+            command_handler::send({ "ExitApplication" });
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
