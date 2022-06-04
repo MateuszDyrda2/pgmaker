@@ -99,8 +99,6 @@ frame* channel::next_frame(const duration& timestamp, bool paused)
     {
         return nullptr;
     }
-    // if(paused) return prevFrame;
-
     if(!nextFrame && !frameQueue.try_dequeue(nextFrame)) return nullptr;
 
     auto pts = nextFrame->timestamp;
@@ -114,11 +112,14 @@ frame* channel::next_frame(const duration& timestamp, bool paused)
                 prevFrame = nextFrame;
             }
             if(!frameQueue.try_dequeue(nextFrame)) return nullptr;
-            // frameQueue.wait_dequeue(nextFrame);
-            // if(!nextFrame) break;
             pts = nextFrame->timestamp;
         }
     }
+    if(prevFrame && timestamp > prevFrame->owner->get_ends_at())
+    {
+        prevFrame = nullptr;
+    }
+
     return prevFrame;
 }
 bool channel::set_paused(bool value)

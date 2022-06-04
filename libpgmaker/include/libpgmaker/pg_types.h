@@ -17,7 +17,7 @@ extern "C"
 namespace libpgmaker {
 struct frame
 {
-    std::pair<std::uint32_t, std::uint32_t> size;
+    class clip* owner;
     std::vector<std::uint8_t> data;
     std::chrono::milliseconds timestamp;
 };

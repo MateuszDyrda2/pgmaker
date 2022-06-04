@@ -113,7 +113,6 @@ set(libpgmaker_SRC
 	src/channel.cpp
 	src/timeline.cpp
 	src/video.cpp
-	src/preview.cpp
 	src/pg_types.cpp
 )
 add_library(libpgmaker STATIC ${libpgmaker_SRC})

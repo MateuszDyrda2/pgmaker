@@ -219,7 +219,7 @@ void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
               0, iFrame->height,
               dest, destLineSize);
 
-    (*oFrame)->size   = size;
+    (*oFrame)->owner  = this;
     (*oFrame)->data   = std::move(buff);
     const auto pts    = iFrame->pts * vidTimebase.num / double(vidTimebase.den);
     const auto ts     = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));

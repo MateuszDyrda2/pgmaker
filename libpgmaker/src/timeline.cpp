@@ -102,7 +102,6 @@ std::pair<const std::vector<timeline::texture_t>&, std::size_t> timeline::next_f
             now - tsChecked);
         tsChecked = now;
     }
-
     vector<frame*> frames;
     for(auto& ch : channels)
     {
@@ -263,9 +262,10 @@ void timeline::texture_for_frame(std::size_t index, frame* f)
     auto& tex = textures[index];
     glActiveTexture(GL_TEXTURE0 + index);
     glBindTexture(GL_TEXTURE_2D, tex.handle);
-    if(f->size != tex.size)
+    auto fsize = f->owner->get_size();
+    if(fsize != tex.size)
     {
-        tex.size = f->size;
+        tex.size = fsize;
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex.size.first, tex.size.second,
                      0, GL_RGBA, GL_UNSIGNED_BYTE, f->data.data());
     }

@@ -28,10 +28,6 @@ class clip
          const milliseconds& startOffset, const milliseconds& endOffset);
     ~clip();
 
-    const auto& get_starts_at() const { return startsAt; }
-    const auto& get_start_offset() const { return startOffset; }
-    const auto& get_end_offset() const { return endOffset; }
-
     auto get_vtimebase() const { return vidTimebase; }
     auto get_atimebase() const { return audioTimebase; }
     auto get_size() const { return size; }
@@ -40,6 +36,11 @@ class clip
     const auto& get_name() const { return name; }
     const auto& get_video() const { return vid; }
     auto get_clip_info() const { return clip_info{ name, vid->get_info().path, get_duration().count() * 0.001, size.first, size.second }; }
+
+    const auto& get_starts_at() const { return startsAt; }
+    auto get_ends_at() const { return startsAt + get_duration(); }
+    const auto& get_start_offset() const { return startOffset; }
+    const auto& get_end_offset() const { return endOffset; }
 
     bool contains(const milliseconds& ts) const;
 
