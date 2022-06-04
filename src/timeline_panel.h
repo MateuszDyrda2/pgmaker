@@ -28,7 +28,6 @@ class timeline_panel : public panel
     std::size_t movedIndex;
     state currentState;
 
-    bool cutActive;
     bool frontCut, backCut;
     std::size_t cutIndex;
 

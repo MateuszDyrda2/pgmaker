@@ -29,7 +29,7 @@ project::project(const std::filesystem::path& path,
                  const std::filesystem::path& tmpDirectory,
                  const std::filesystem::path& assetDirectory):
     videos(),
-    tl(project_settings{ { 1920, 1080 }, 60 }),
+    tl(),
     path(path),
     workingDirectory(workingDirectory),
     tmpDirectory(tmpDirectory), assetDirectory(assetDirectory)
@@ -83,10 +83,12 @@ project::project(const std::filesystem::path& path,
             }
         }
     }
+    size = { j.at("width").get<uint32_t>(), j.at("height").get<uint32_t>() };
+    tl.set_size(size);
 }
 project::project(const std::filesystem::path& path):
     videos(),
-    tl(project_settings{ { 1920, 1080 }, 60 }),
+    tl(),
     path(path)
 {
     workingDirectory = path.parent_path();
@@ -95,6 +97,7 @@ project::project(const std::filesystem::path& path):
     std::filesystem::create_directory(tmpDirectory);
     std::filesystem::create_directory(assetDirectory);
     name = path.stem().string();
+    size = { 1920, 1080 };
 }
 project::~project()
 {
@@ -175,5 +178,7 @@ void to_json(json& j, const timeline& tl)
 }
 void to_json(json& j, const project& pr)
 {
-    j = { { "timeline", pr.get_timeline() } };
+    j = { { "timeline", pr.get_timeline() },
+          { "width", pr.get_size().first },
+          { "height", pr.get_size().second } };
 }

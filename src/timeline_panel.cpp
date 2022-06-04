@@ -5,7 +5,8 @@
 
 using namespace libpgmaker;
 timeline_panel::timeline_panel():
-    currentState(state::CLK)
+    currentState(state::CLK), frontCut{ false },
+    backCut{ false }, cutIndex{}, wasMoved{ false }
 {
     auto proj = project_manager::get_current_project();
     auto& tl  = proj->get_timeline();
@@ -74,11 +75,20 @@ void timeline_panel::draw_tools(timeline& tl)
     auto regSize                 = ImGui::GetWindowSize().x * 0.5f;
 
     ImGui::SetCursorPos(ImVec2(regSize - 55.f, 20.f));
-    if(ImGui::Button("CLK", ImVec2(30.f, 30.f))) currentState = state::CLK;
+    if(ImGui::Button("CLK", ImVec2(30.f, 30.f)))
+    {
+        currentState = state::CLK;
+    }
     ImGui::SetCursorPos(ImVec2(regSize - 15.f, 20.f));
-    if(ImGui::Button("MOV", ImVec2(30.f, 30.f))) currentState = state::MOV;
+    if(ImGui::Button("MOV", ImVec2(30.f, 30.f)))
+    {
+        currentState = state::MOV;
+    }
     ImGui::SetCursorPos(ImVec2(regSize + 25.f, 20.f));
-    if(ImGui::Button("CUT", ImVec2(30.f, 30.f))) currentState = state::CUT;
+    if(ImGui::Button("CUT", ImVec2(30.f, 30.f)))
+    {
+        currentState = state::CUT;
+    }
 }
 
 void timeline_panel::draw_timeline(libpgmaker::timeline& tl)
@@ -182,7 +192,7 @@ void timeline_panel::draw_clip(libpgmaker::timeline& tl,
     ImGui::PushID(cl->get_id());
 
     auto starts    = cl->get_starts_at().count();
-    auto ends      = starts + cl->get_duration().count();
+    auto ends      = cl->get_ends_at().count();
     auto stDiv     = starts / double(timemax);
     auto edDiv     = ends / double(timemax);
     float clipXMin = xmin + stDiv * (xmax - xmin),
@@ -195,12 +205,15 @@ void timeline_panel::draw_clip(libpgmaker::timeline& tl,
     switch(currentState)
     {
     case state::CLK:
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
         handle_clk(cl);
         break;
     case state::MOV:
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
         handle_mov(cl, i, j, clipXMin, clipXMax, xmin, xmax);
         break;
     case state::CUT:
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
         handle_cut(cl, i, j, canvasPos, xmin, xmax);
         break;
     }
@@ -268,13 +281,15 @@ void timeline_panel::handle_cut(const std::unique_ptr<libpgmaker::clip>& cl,
         if(mousex <= minx + 30)
         {
             frontCut = true;
+            cutIndex = cl->get_id();
         }
         else if(mousex >= maxx - 30)
         {
-            backCut = true;
+            backCut  = true;
+            cutIndex = cl->get_id();
         }
     }
-    else if(frontCut && !isMouseDragging)
+    else if(frontCut && !isMouseDragging && cutIndex == cl->get_id())
     {
         frontCut = false;
         auto ts  = std::chrono::milliseconds(
@@ -283,7 +298,7 @@ void timeline_panel::handle_cut(const std::unique_ptr<libpgmaker::clip>& cl,
         command_handler::send({ "TimelineClipStartOffset",
                                 new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(i, j, offset) });
     }
-    else if(backCut && !isMouseDragging)
+    else if(backCut && !isMouseDragging && cutIndex == cl->get_id())
     {
         backCut = false;
         auto ts = std::chrono::milliseconds(

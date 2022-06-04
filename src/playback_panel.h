@@ -12,8 +12,4 @@ class playback_panel : public panel
     playback_panel();
     ~playback_panel();
     void draw() override;
-
-  private:
-    unsigned int texture;
-    std::pair<std::uint32_t, std::uint32_t> textureSize{ 1080, 720 };
 };

@@ -8,8 +8,8 @@
 namespace libpgmaker {
 using namespace std;
 using namespace chrono_literals;
-timeline::timeline(const project_settings& settings):
-    paused(false), settings(settings),
+timeline::timeline():
+    paused(false), size(),
     ts(0), tsChecked()
 {
     rebuild();
@@ -17,7 +17,7 @@ timeline::timeline(const project_settings& settings):
     initialize_audio();
 }
 timeline::timeline(timeline&& other) noexcept:
-    paused(other.paused), settings(other.settings),
+    paused(other.paused), size(other.size),
     ts(0), tsChecked(), channels(std::move(other.channels))
 {
 }
@@ -26,7 +26,7 @@ timeline& timeline::operator=(timeline&& other) noexcept
     if(this != &other)
     {
         paused    = other.paused;
-        settings  = other.settings;
+        size      = other.size;
         ts        = milliseconds(0);
         tsChecked = time_point();
         channels  = std::move(other.channels);
@@ -105,7 +105,6 @@ std::pair<const std::vector<timeline::texture_t>&, std::size_t> timeline::next_f
     vector<frame*> frames;
     for(auto& ch : channels)
     {
-        // frames.push_back(ch->next_frame(ts, paused));
         auto frame = ch->next_frame(ts, paused);
         if(frame) frames.push_back(frame);
     }
@@ -133,7 +132,6 @@ bool timeline::set_paused(bool value)
     }
     return old;
 }
-
 bool timeline::toggle_pause()
 {
     auto old = paused;
@@ -248,6 +246,10 @@ void timeline::stop()
         [](auto& ch) {
             ch->stop();
         });
+}
+void timeline::set_size(const std::pair<uint32_t, uint32_t>& size)
+{
+    this->size = size;
 }
 void timeline::start()
 {

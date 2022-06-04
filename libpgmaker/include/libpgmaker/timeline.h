@@ -24,12 +24,11 @@ class timeline
     using duration     = channel::duration;
 
   public:
-    timeline() = default;
     /** @brief Create a timeline specifying the settings.
      * The settings can be changed at any moment
      * @param settings project settings
      */
-    timeline(const project_settings& settings);
+    timeline();
     timeline(std::deque<std::unique_ptr<channel>>&& channels);
     timeline(timeline&& other) noexcept;
     timeline& operator=(timeline&& other) noexcept;
@@ -87,17 +86,16 @@ class timeline
     milliseconds get_duration() const;
     /** @return Whether the timeline is paused */
     bool get_paused() const { return paused; }
-    void set_size(const std::pair<unsigned int, unsigned int>& size) { this->size = size; }
+    void set_size(const std::pair<uint32_t, uint32_t>& size);
 
   private:
     bool paused;
-    project_settings settings;
     std::deque<std::unique_ptr<channel>> channels;
 
     milliseconds ts;
     time_point tsChecked;
-    std::pair<unsigned int, unsigned int> size;
 
+    std::pair<uint32_t, uint32_t> size;
     std::vector<texture_t> textures;
 
   private:

@@ -27,19 +27,22 @@ void playback_panel::draw()
         ImGui::BeginChild("VideoRender", { vpsize.x, vpsize.y - videoOptHeight });
         {
             ////////////////////////
-            auto pos  = ImGui::GetWindowPos();
-            auto size = ImGui::GetWindowSize();
-            tl.set_size({ size.x, size.y });
+            auto pos     = ImGui::GetWindowPos();
+            auto size    = ImGui::GetContentRegionAvail();
+            auto xScaler = size.x / proj->get_size().first;
+            auto yScaler = size.y / proj->get_size().second;
 
             auto&& [textures, nbTextures] = tl.next_frame();
             while(nbTextures-- > 0)
             {
-                auto& tex = textures[nbTextures];
-                ImGui::SetCursorPos({ (size.x - tex.size.first) * 0.5f,
-                                      (size.y - tex.size.second) * 0.5f });
+                auto& tex       = textures[nbTextures];
+                auto texScaledW = tex.size.first * xScaler;
+                auto texScaledH = tex.size.second * yScaler;
+                ImGui::SetCursorPos({ (size.x - texScaledW) * 0.5f,
+                                      (size.y - texScaledH) * 0.5f });
                 ImGui::Image(
                     reinterpret_cast<ImTextureID>(textures[nbTextures].handle),
-                    { textures[nbTextures].size.first, textures[nbTextures].size.second });
+                    { texScaledW, texScaledH });
             }
             ////////////////////////
         }

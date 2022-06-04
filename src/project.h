@@ -41,6 +41,8 @@ class project
     libpgmaker::timeline& get_timeline();
     const libpgmaker::timeline& get_timeline() const;
 
+    const auto& get_size() const { return size; }
+
   private:
     video_manager videos;
     libpgmaker::timeline tl;
@@ -50,6 +52,9 @@ class project
     std::filesystem::path workingDirectory;
     std::filesystem::path tmpDirectory;
     std::filesystem::path assetDirectory;
+
+    std::pair<std::uint32_t, std::uint32_t> size;
+    std::size_t framerate;
 
   private:
     void scan_assets();

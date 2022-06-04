@@ -5,8 +5,8 @@
 namespace libpgmaker {
 struct project_settings
 {
-    std::pair<std::uint32_t, std::uint32_t> size;
-    std::size_t framerate;
+    inline static std::pair<std::uint32_t, std::uint32_t> size;
+    inline static std::size_t framerate;
 };
 
 } // namespace libpgmaker
