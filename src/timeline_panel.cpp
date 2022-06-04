@@ -4,7 +4,8 @@
 #include "events.h"
 
 using namespace libpgmaker;
-timeline_panel::timeline_panel()
+timeline_panel::timeline_panel():
+    currentState(state::CLK)
 {
     auto proj = project_manager::get_current_project();
     auto& tl  = proj->get_timeline();
@@ -38,6 +39,20 @@ timeline_panel::timeline_panel()
                 std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>*>(c.data);
             tl.move_clip(index, j, to);
         });
+    command_handler::listen(
+        "TimelineClipStartOffset",
+        [&tl](command& c) {
+            auto&& [i, j, by] = *reinterpret_cast<
+                std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>*>(c.data);
+            tl.get_channel(i)->get_clip(j)->change_start_offset(by);
+        });
+    command_handler::listen(
+        "TimelineClipEndOffset",
+        [&tl](command& c) {
+            auto&& [i, j, by] = *reinterpret_cast<
+                std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>*>(c.data);
+            tl.get_channel(i)->get_clip(j)->change_end_offset(by);
+        });
 }
 timeline_panel::~timeline_panel()
 {
@@ -55,7 +70,17 @@ void timeline_panel::draw()
 }
 void timeline_panel::draw_tools(timeline& tl)
 {
-    auto regSize = ImGui::GetWindowSize().x / 2.f;
+    auto&& [winWidth, winHeight] = ImGui::GetContentRegionAvail();
+    auto regSize                 = ImGui::GetWindowSize().x / 2.f;
+    if(ImGui::Button("CLK", { 30.f, 30.f }))
+        currentState = state::CLK;
+    ImGui::SameLine();
+    if(ImGui::Button("MOV", { 30.f, 30.f }))
+        currentState = state::MOV;
+    ImGui::SameLine();
+    if(ImGui::Button("CUT", { 30.f, 30.f }))
+        currentState = state::CUT;
+
     ImGui::SetCursorPos(ImVec2(regSize - 70.f, 20.f));
     if(ImGui::Button("<<", ImVec2(40.f, 40.f)))
     {
@@ -84,37 +109,41 @@ void timeline_panel::draw_timeline(libpgmaker::timeline& tl)
         auto canvasSize                 = ImGui::GetContentRegionAvail();
         auto canvasPos                  = ImGui::GetCursorScreenPos();
         static constexpr auto textWidth = 100.f;
-        float xmin                      = canvasPos.x + textWidth;
-        float xmax                      = canvasPos.x + canvasSize.x;
+        float xmin                      = textWidth;
+        float xmax                      = canvasSize.x;
         float channelHeight = 60, channelMargin = 10;
         const auto timemax = 20000;
+        auto xminAbs = xmin + canvasPos.x, xmaxAbs = xmax + canvasPos.x;
 
         /////////////////////////////////////////////
         // DRAW LINE
         /////////////////////////////////////////////
-        if(ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        if(currentState == state::CLK)
         {
-            auto mousePos = io.MouseClickedPos[0];
-            if(mousePos.x >= xmin && mousePos.x <= xmax)
+            if(ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
-                auto timePos = (mousePos.x - xmin) / (xmax - xmin) * timemax;
-                command_handler::send({ "TimelineSeek", new std::chrono::milliseconds(std::int64_t(timePos)) });
+                auto mousePos = io.MouseClickedPos[0];
+                if(mousePos.x >= xminAbs && mousePos.x <= xmaxAbs)
+                {
+                    auto timePos = (mousePos.x - xminAbs) / (xmax - xmin) * timemax;
+                    command_handler::send({ "TimelineSeek", new std::chrono::milliseconds(std::int64_t(timePos)) });
+                }
             }
         }
-        const auto ts  = tl.get_timestamp().count();
-        float xlinepos = xmin + (ts / double(timemax) * (xmax - xmin));
-
         /////////////////////////////////////////////
 
         for(const auto& ch : tl.get_channels())
         {
-            ImVec2 channelPos = { canvasPos.x, (channelHeight + channelMargin) * ch->get_index() };
+            ImVec2 channelPos = { 0, (channelHeight + channelMargin) * ch->get_index() };
             draw_channel(tl, ch, xmin, xmax, channelPos, canvasPos, drawList);
         }
         if(ImGui::Button("+", ImVec2(40, 40)))
         {
             command_handler::send({ "TimelineAddChannel" });
         }
+
+        const auto ts  = tl.get_timestamp().count();
+        float xlinepos = xminAbs + (ts / double(timemax) * (xmax - xmin));
         drawList->AddLine(
             { float(xlinepos), canvasPos.y },
             { float(xlinepos), canvasPos.y + canvasSize.y },
@@ -130,7 +159,7 @@ void timeline_panel::draw_channel(timeline& tl, const std::unique_ptr<channel>& 
 {
     auto index = ch->get_index();
     ImGui::SetCursorPos(channelPos);
-    if(ImGui::Button(("Channel " + std::to_string(index)).c_str(), { xmin - canvasPos.x, channelHeight }))
+    if(ImGui::Button(("Channel " + std::to_string(index)).c_str(), { 100, channelHeight }))
         ;
     //
     ImGui::PushID(ch->get_id());
@@ -138,8 +167,8 @@ void timeline_panel::draw_channel(timeline& tl, const std::unique_ptr<channel>& 
     ImGui::InvisibleButton("", ImVec2(xmax - xmin, channelHeight));
 
     drawList->AddRectFilled(
-        { xmin, canvasPos.y + channelPos.y },
-        { xmax, canvasPos.y + channelPos.y + channelHeight },
+        { xmin + canvasPos.x, canvasPos.y + channelPos.y },
+        { xmax + canvasPos.x, canvasPos.y + channelPos.y + channelHeight },
         0xFF3D3837, 0);
     if(ImGui::BeginDragDropTarget())
     {
@@ -182,6 +211,44 @@ void timeline_panel::draw_clip(libpgmaker::timeline& tl,
 
     bool isItemActive    = ImGui::IsItemActive();
     bool isMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+    switch(currentState)
+    {
+    case state::CLK:
+        handle_clk(cl);
+        break;
+    case state::MOV:
+        handle_mov(cl, i, j, clipXMin, clipXMax, xmin, xmax);
+        break;
+    case state::CUT:
+        handle_cut(cl, i, j, canvasPos, xmin, xmax);
+        break;
+    }
+    drawList->AddRectFilled(
+        { canvasPos.x + clipXMin, canvasPos.y + channelPos.y },
+        { canvasPos.x + clipXMax, canvasPos.y + channelPos.y + channelHeight },
+        0xFF0000AA, 4.f, 0);
+    drawList->AddRect(
+        { canvasPos.x + clipXMin, canvasPos.y + channelPos.y },
+        { canvasPos.x + clipXMax, canvasPos.y + channelPos.y + channelHeight },
+        0xFF000000, 4.f, 0, 3.f);
+
+    ImGui::PopID();
+}
+void timeline_panel::handle_clk(const std::unique_ptr<libpgmaker::clip>& cl)
+{
+    bool isItemActive = ImGui::IsItemActive();
+    if(isItemActive)
+    {
+        command_handler::send({ "DisplayInfo", new clip_info(cl->get_clip_info()) });
+    }
+}
+void timeline_panel::handle_mov(const std::unique_ptr<libpgmaker::clip>& cl,
+                                std::size_t i, std::size_t j,
+                                float& clipXMin, float& clipXMax,
+                                float xmin, float xmax)
+{
+    bool isItemActive    = ImGui::IsItemActive();
+    bool isMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
     if(isItemActive && isMouseDragging)
     {
         wasMoved   = true;
@@ -196,14 +263,52 @@ void timeline_panel::draw_clip(libpgmaker::timeline& tl,
         auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
         // auto posdiff      = io.MouseDelta.x;
         float newClipXmin = clipXMin + delta.x;
-        auto inDur        = ((newClipXmin - xmin) / (xmax - xmin)) * timemax;
+        clipXMin += delta.x;
+        clipXMax += delta.x;
+        auto inDur = ((newClipXmin - xmin) / (xmax - xmin)) * timemax;
         command_handler::send(
             { "TimelineMoveClip",
               new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(i, j, std::int64_t(inDur)) });
     }
-    drawList->AddRectFilled(
-        { float(clipXMin), canvasPos.y + channelPos.y },
-        { float(clipXMax), canvasPos.y + channelPos.y + channelHeight },
-        0xFF0000AA, 2.5f);
-    ImGui::PopID();
+}
+void timeline_panel::handle_cut(const std::unique_ptr<libpgmaker::clip>& cl,
+                                std::size_t i, std::size_t j,
+                                ImVec2 canvasPos,
+                                float xmin, float xmax)
+{
+    bool isItemActive       = ImGui::IsItemActive();
+    bool isMouseDragging    = ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.1f);
+    auto&& [mousex, mousey] = ImGui::GetMousePos();
+    auto&& [minx, miny]     = ImGui::GetItemRectMin();
+    auto&& [maxx, maxy]     = ImGui::GetItemRectMax();
+
+    if(isItemActive && isMouseDragging)
+    {
+        if(mousex <= minx + 30)
+        {
+            frontCut = true;
+        }
+        else if(mousex >= maxx - 30)
+        {
+            backCut = true;
+        }
+    }
+    else if(frontCut && !isMouseDragging)
+    {
+        frontCut = false;
+        auto ts  = std::chrono::milliseconds(
+             std::int64_t(timemax * (mousex - (xmin + canvasPos.x)) / (xmax - xmin)));
+        auto offset = ts - cl->get_starts_at();
+        command_handler::send({ "TimelineClipStartOffset",
+                                new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(i, j, offset) });
+    }
+    else if(backCut && !isMouseDragging)
+    {
+        backCut = false;
+        auto ts = std::chrono::milliseconds(
+            std::int64_t(timemax * (mousex - (xmin + canvasPos.x)) / (xmax - xmin)));
+        auto offset = (cl->get_starts_at() + cl->get_duration()) - ts;
+        command_handler::send({ "TimelineClipEndOffset",
+                                new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(i, j, offset) });
+    }
 }

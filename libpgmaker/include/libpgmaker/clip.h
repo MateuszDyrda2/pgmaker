@@ -9,6 +9,13 @@
 #include <vector>
 
 namespace libpgmaker {
+struct clip_info
+{
+    std::string name;
+    std::string path;
+    double duration;
+    unsigned int width, height;
+};
 class clip
 {
   public:
@@ -31,6 +38,8 @@ class clip
     auto get_duration() const { return vid->get_info().duration - startOffset - endOffset; }
     auto get_id() const { return clipId; }
     const auto& get_name() const { return name; }
+    const auto& get_video() const { return vid; }
+    auto get_clip_info() const { return clip_info{ name, vid->get_info().path, get_duration().count() * 0.001, size.first, size.second }; }
 
     bool contains(const milliseconds& ts) const;
 
@@ -41,7 +50,9 @@ class clip
 
     void set_starts_at(const milliseconds& startsAt);
     void set_start_offset(const milliseconds& startOffset);
+    void change_start_offset(const milliseconds& by);
     void set_end_offset(const milliseconds& endOffset);
+    void change_end_offset(const milliseconds& by);
 
     bool seek(const milliseconds& ts);
     void reset();

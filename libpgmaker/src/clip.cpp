@@ -24,7 +24,7 @@ clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt
 clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
            const milliseconds& startOffset, const milliseconds& endOffset):
     vid(vid),
-    name(name), startsAt(startsAt), startOffset(startOffset),
+    name(vid->get_info().name), startsAt(startsAt), startOffset(startOffset),
     endOffset(endOffset), size{},
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
@@ -132,9 +132,32 @@ void clip::set_start_offset(const milliseconds& startOffset)
     this->startOffset = startOffset;
     seek_start();
 }
+void clip::change_start_offset(const milliseconds& by)
+{
+    auto realBy = by;
+    if(startOffset + realBy < milliseconds(0))
+        realBy = -startOffset;
+
+    if(startOffset + realBy > vid->get_info().duration - endOffset)
+        return;
+
+    startOffset += realBy;
+    startsAt += realBy;
+}
 void clip::set_end_offset(const milliseconds& endOffset)
 {
     this->endOffset = endOffset;
+}
+void clip::change_end_offset(const milliseconds& by)
+{
+    auto realBy = by;
+    if(endOffset + realBy < milliseconds(0))
+        realBy = -endOffset;
+
+    if(endOffset + realBy > vid->get_info().duration - startOffset)
+        return;
+
+    endOffset += realBy;
 }
 void clip::seek_start()
 {

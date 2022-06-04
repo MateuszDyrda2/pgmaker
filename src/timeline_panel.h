@@ -6,6 +6,13 @@
 
 class timeline_panel : public panel
 {
+    enum class state
+    {
+        CLK,
+        MOV,
+        CUT
+    };
+
   public:
     static constexpr float channelHeight = 60;
     static constexpr float channelMargin = 10;
@@ -19,6 +26,11 @@ class timeline_panel : public panel
   private:
     bool wasMoved;
     std::size_t movedIndex;
+    state currentState;
+
+    bool cutActive;
+    bool frontCut, backCut;
+    std::size_t cutIndex;
 
   private:
     void draw_tools(libpgmaker::timeline& tl);
@@ -36,4 +48,13 @@ class timeline_panel : public panel
                    ImVec2 channelPos,
                    ImVec2 canvasPos,
                    ImDrawList* drawList);
+    void handle_clk(const std::unique_ptr<libpgmaker::clip>& cl);
+    void handle_mov(const std::unique_ptr<libpgmaker::clip>& cl,
+                    std::size_t i, std::size_t j,
+                    float& clipXMin, float& clipXMax,
+                    float xmin, float xmax);
+    void handle_cut(const std::unique_ptr<libpgmaker::clip>& cl,
+                    std::size_t i, std::size_t j,
+                    ImVec2 canvasPos,
+                    float xmin, float xmax);
 };
