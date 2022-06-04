@@ -11,7 +11,7 @@ using namespace std;
 clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt):
     vid(vid),
     name(vid->get_info().name), startOffset{}, endOffset{}, startsAt(startsAt),
-    width{}, height{},
+    size{},
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
     swsCtx{}, vidTimebase{}, audioTimebase{}, clipId(id_generator::get_next())
@@ -25,7 +25,7 @@ clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
            const milliseconds& startOffset, const milliseconds& endOffset):
     vid(vid),
     name(name), startsAt(startsAt), startOffset(startOffset),
-    endOffset(endOffset), width{}, height{},
+    endOffset(endOffset), size{},
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
     swsCtx{}, vidTimebase{}, audioTimebase{}, clipId(id_generator::get_next())
@@ -34,13 +34,6 @@ clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
     open_input(vid->get_info().path);
     audioFrame = av_frame_alloc();
 }
-void clip::assign_video(const std::shared_ptr<video>& vid)
-{
-    assert(vid->get_info().name == name);
-    this->vid = vid;
-    open_input(vid->get_info().path);
-}
-
 clip::~clip()
 {
     av_frame_free(&audioFrame);
@@ -71,8 +64,7 @@ void clip::open_input(const string& path)
         if(streams->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
             vsIndex = i;
-            width   = streams->codecpar->width;
-            height  = streams->codecpar->height;
+            size    = { streams->codecpar->width, streams->codecpar->height };
         }
         else if(streams->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
@@ -95,8 +87,8 @@ void clip::open_input(const string& path)
     }
 
     // convert to rgba
-    swsCtx = sws_getContext(width, height, pVideoCodecCtx->pix_fmt,
-                            width, height, AV_PIX_FMT_RGB0,
+    swsCtx = sws_getContext(size.first, size.second, pVideoCodecCtx->pix_fmt,
+                            size.first, size.second, AV_PIX_FMT_RGB0,
                             SWS_BILINEAR, NULL, NULL, NULL);
     if(!swsCtx)
     {
@@ -131,16 +123,16 @@ bool clip::open_codec(AVCodecParameters* codecParams, AVCodecContext** ctx)
     }
     return false;
 }
-void clip::move_to(const milliseconds& startsAt)
+void clip::set_starts_at(const milliseconds& startsAt)
 {
     this->startsAt = startsAt;
 }
-void clip::change_start_offset(const milliseconds& startOffset)
+void clip::set_start_offset(const milliseconds& startOffset)
 {
     this->startOffset = startOffset;
     seek_start();
 }
-void clip::change_end_offset(const milliseconds& endOffset)
+void clip::set_end_offset(const milliseconds& endOffset)
 {
     this->endOffset = endOffset;
 }
@@ -197,14 +189,14 @@ bool clip::get_frame(packet& pPacket, AVFrame** frame)
 void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
 {
     // auto buff             = new std::uint8_t[width * height * 4];
-    std::vector<std::uint8_t> buff(width * height * 4);
+    std::vector<std::uint8_t> buff(size.first * size.second * 4);
     std::uint8_t* dest[4] = { buff.data(), nullptr, nullptr, nullptr };
-    int destLineSize[4]   = { int(width) * 4, 0, 0, 0 };
+    int destLineSize[4]   = { int(size.first) * 4, 0, 0, 0 };
     sws_scale(swsCtx, iFrame->data, iFrame->linesize,
               0, iFrame->height,
               dest, destLineSize);
 
-    (*oFrame)->size   = { width, height };
+    (*oFrame)->size   = size;
     (*oFrame)->data   = std::move(buff);
     const auto pts    = iFrame->pts * vidTimebase.num / double(vidTimebase.den);
     const auto ts     = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));

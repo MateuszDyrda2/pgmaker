@@ -97,14 +97,11 @@ frame* channel::next_frame(const duration& timestamp, bool paused)
 {
     if(timestamp > lenght)
     {
-        return 0;
+        return nullptr;
     }
-    if(paused) return prevFrame;
-    if(!nextFrame)
-    {
-        if(!frameQueue.try_dequeue(nextFrame))
-            return nullptr;
-    }
+    // if(paused) return prevFrame;
+
+    if(!nextFrame && !frameQueue.try_dequeue(nextFrame)) return nullptr;
 
     auto pts = nextFrame->timestamp;
     if(timestamp >= pts)
@@ -116,7 +113,9 @@ frame* channel::next_frame(const duration& timestamp, bool paused)
                 delete prevFrame;
                 prevFrame = nextFrame;
             }
-            if(!frameQueue.try_dequeue(nextFrame)) break;
+            if(!frameQueue.try_dequeue(nextFrame)) return nullptr;
+            // frameQueue.wait_dequeue(nextFrame);
+            // if(!nextFrame) break;
             pts = nextFrame->timestamp;
         }
     }
@@ -388,7 +387,7 @@ void channel::move_clip(std::size_t index, const milliseconds& to)
         });
     if(canMove != clips.end()) return;
 
-    cl->move_to(to);
+    cl->set_starts_at(to);
 
     reorder_clips();
     recalculate_lenght();

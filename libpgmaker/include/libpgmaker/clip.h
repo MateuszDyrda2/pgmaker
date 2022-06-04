@@ -21,32 +21,35 @@ class clip
          const milliseconds& startOffset, const milliseconds& endOffset);
     ~clip();
 
-    void assign_video(const std::shared_ptr<video>& vid);
-    const milliseconds& get_starts_at() const { return startsAt; }
-    const milliseconds& get_start_offset() const { return startOffset; }
-    const milliseconds& get_end_offset() const { return endOffset; }
-    AVRational get_vtimebase() const { return vidTimebase; }
-    AVRational get_atimebase() const { return audioTimebase; }
-    std::uint32_t get_width() const { return width; }
-    std::uint32_t get_height() const { return height; }
-    milliseconds get_duration() const { return vid->get_info().duration - startOffset - endOffset; }
+    const auto& get_starts_at() const { return startsAt; }
+    const auto& get_start_offset() const { return startOffset; }
+    const auto& get_end_offset() const { return endOffset; }
+
+    auto get_vtimebase() const { return vidTimebase; }
+    auto get_atimebase() const { return audioTimebase; }
+    auto get_size() const { return size; }
+    auto get_duration() const { return vid->get_info().duration - startOffset - endOffset; }
+    auto get_id() const { return clipId; }
+    const auto& get_name() const { return name; }
+
     bool contains(const milliseconds& ts) const;
 
-    void move_to(const milliseconds& startsAt);
-    bool seek(const milliseconds& ts);
-    void change_start_offset(const milliseconds& startOffset);
-    void change_end_offset(const milliseconds& endOffset);
-    void reset();
     bool get_packet(packet& pPacket);
     bool get_frame(packet& pPacket, AVFrame** frame);
     std::size_t get_audio_frame(packet* pPacket, std::vector<float>& b);
     void convert_frame(AVFrame* iFrame, frame** oFrame);
+
+    void set_starts_at(const milliseconds& startsAt);
+    void set_start_offset(const milliseconds& startOffset);
+    void set_end_offset(const milliseconds& endOffset);
+
+    bool seek(const milliseconds& ts);
+    void reset();
+
     milliseconds audio_convert_pts(std::int64_t pts) const;
     std::int64_t audio_reconvert_pts(const milliseconds& pts) const;
     milliseconds video_convert_pts(std::int64_t pts) const;
     std::int64_t video_reconvert_pts(const milliseconds& pts) const;
-    const std::string& get_name() const { return vid->get_info().name; }
-    std::uint64_t get_id() const { return clipId; }
 
   private:
     std::shared_ptr<video> vid;
@@ -56,7 +59,7 @@ class clip
     milliseconds endOffset;
     milliseconds startsAt;
 
-    std::uint32_t width, height;
+    std::pair<uint32_t, uint32_t> size;
     AVFormatContext* pFormatCtx;
     AVCodecContext* pVideoCodecCtx;
     AVCodecContext* pAudioCodecCtx;
