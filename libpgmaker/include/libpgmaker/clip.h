@@ -93,5 +93,6 @@ class clip
     bool open_codec(AVCodecParameters* codecParams, AVCodecContext** ctx);
     void fill_buffer();
     void seek_start();
+	bool seek_impl(const milliseconds& localTs);
 };
 }

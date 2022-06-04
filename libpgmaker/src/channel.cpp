@@ -115,9 +115,13 @@ frame* channel::next_frame(const duration& timestamp, bool paused)
             pts = nextFrame->timestamp;
         }
     }
-    if(prevFrame && timestamp > prevFrame->owner->get_ends_at())
+    if(prevFrame)
     {
-        prevFrame = nullptr;
+        if(timestamp < prevFrame->owner->get_starts_at()
+           || timestamp > prevFrame->owner->get_ends_at())
+        {
+            prevFrame = nullptr;
+        }
     }
 
     return prevFrame;

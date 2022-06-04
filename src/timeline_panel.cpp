@@ -71,33 +71,14 @@ void timeline_panel::draw()
 void timeline_panel::draw_tools(timeline& tl)
 {
     auto&& [winWidth, winHeight] = ImGui::GetContentRegionAvail();
-    auto regSize                 = ImGui::GetWindowSize().x / 2.f;
-    if(ImGui::Button("CLK", { 30.f, 30.f }))
-        currentState = state::CLK;
-    ImGui::SameLine();
-    if(ImGui::Button("MOV", { 30.f, 30.f }))
-        currentState = state::MOV;
-    ImGui::SameLine();
-    if(ImGui::Button("CUT", { 30.f, 30.f }))
-        currentState = state::CUT;
+    auto regSize                 = ImGui::GetWindowSize().x * 0.5f;
 
-    ImGui::SetCursorPos(ImVec2(regSize - 70.f, 20.f));
-    if(ImGui::Button("<<", ImVec2(40.f, 40.f)))
-    {
-        command_handler::send({ "TimelineSeek", new std::chrono::milliseconds(
-                                                    tl.get_timestamp() - std::chrono::milliseconds(3000)) });
-    }
-    ImGui::SetCursorPos(ImVec2(regSize - 20.f, 20.f));
-    if(ImGui::Button(">", ImVec2(40.f, 40.f)))
-    {
-        command_handler::send({ "TimelinePause" });
-    }
-    ImGui::SetCursorPos(ImVec2(regSize + 30.f, 20.f));
-    if(ImGui::Button(">>", ImVec2(40.f, 40.f)))
-    {
-        command_handler::send({ "TimelineSeek", new std::chrono::milliseconds(
-                                                    tl.get_timestamp() - std::chrono::milliseconds(3000)) });
-    }
+    ImGui::SetCursorPos(ImVec2(regSize - 55.f, 20.f));
+    if(ImGui::Button("CLK", ImVec2(30.f, 30.f))) currentState = state::CLK;
+    ImGui::SetCursorPos(ImVec2(regSize - 15.f, 20.f));
+    if(ImGui::Button("MOV", ImVec2(30.f, 30.f))) currentState = state::MOV;
+    ImGui::SetCursorPos(ImVec2(regSize + 25.f, 20.f));
+    if(ImGui::Button("CUT", ImVec2(30.f, 30.f))) currentState = state::CUT;
 }
 
 void timeline_panel::draw_timeline(libpgmaker::timeline& tl)

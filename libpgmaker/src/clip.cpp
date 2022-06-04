@@ -143,6 +143,9 @@ void clip::change_start_offset(const milliseconds& by)
 
     startOffset += realBy;
     startsAt += realBy;
+
+    // seek_impl(startOffset);
+    // seek_start();
 }
 void clip::set_end_offset(const milliseconds& endOffset)
 {
@@ -170,7 +173,8 @@ void clip::seek_start()
 }
 void clip::reset()
 {
-    seek_start();
+    // seek_start();
+    seek_impl(startOffset);
 }
 bool clip::get_packet(packet& pPacket)
 {
@@ -274,13 +278,17 @@ bool clip::seek(const milliseconds& ts)
     assert(ts >= startsAt);
     assert(ts <= startsAt + get_duration());
 
+    auto realTs = ts - startsAt + startOffset;
+    return seek_impl(realTs);
+}
+bool clip::seek_impl(const milliseconds& localTs)
+{
     auto currentPos = video_convert_pts(vidCurrentTs);
-    auto realTs     = ts - startsAt + startOffset;
-    auto diff       = realTs - currentPos;
+    auto diff       = localTs - currentPos;
 
     const auto currentPosInSec = chrono::duration_cast<chrono::duration<double>>(currentPos);
     const auto diffInSec       = chrono::duration_cast<chrono::duration<double>>(diff);
-    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(realTs);
+    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(localTs);
 
     std::int64_t curr = currentPosInSec.count() * AV_TIME_BASE;
     std::int64_t inc  = diffInSec.count() * AV_TIME_BASE;
