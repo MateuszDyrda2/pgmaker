@@ -85,6 +85,11 @@ project::project(const std::filesystem::path& path,
     }
     size = { j.at("width").get<uint32_t>(), j.at("height").get<uint32_t>() };
     tl.set_size(size);
+
+    video_reader::copy_with_effect(
+        "/home/matzix/shared/PGMaker/build/assets/20220601_180450.mp4",
+        "/home/matzix/shared/PGMaker/build/tmp/20220601_180450tmp.mp4",
+        std::function([](void*, void*, int, int) {}));
 }
 project::project(const std::filesystem::path& path):
     videos(),

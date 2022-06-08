@@ -174,6 +174,7 @@ void clip::seek_start()
 void clip::reset()
 {
     // seek_start();
+    flush();
     seek_impl(startOffset);
 }
 bool clip::get_packet(packet& pPacket)
@@ -186,30 +187,48 @@ bool clip::get_packet(packet& pPacket)
     {
         return true;
     }
+    double time = 0;
+    bool ret    = true;
+    if(p->stream_index == vsIndex)
+    {
+        time                 = p->pts * vidTimebase.num / (double)vidTimebase.den;
+        vidCurrentStreamPos  = p->pos;
+        vidCurrentTs         = p->pts;
+        const auto millitime = chrono::duration<double>(time);
+        const auto endtime   = vid->get_info().duration - endOffset;
+        ret                  = (millitime < endtime);
+    }
+    else if(p->stream_index == asIndex)
+    {
+        time = p->pts * audioTimebase.num / (double)audioTimebase.den;
+    }
+    pPacket.owner   = this;
+    pPacket.payload = p;
 
-    const auto time      = p->pts * vidTimebase.num / (double)vidTimebase.den;
-    const auto millitime = chrono::duration<double>(time);
-    const auto endtime   = vid->get_info().duration - endOffset;
-    vidCurrentStreamPos  = p->pos;
-    vidCurrentTs         = p->pts;
-    pPacket.owner        = this;
-    pPacket.payload      = p;
-    return (millitime < endtime);
+    return ret;
 }
 bool clip::get_frame(packet& pPacket, AVFrame** frame)
 {
-    if(avcodec_send_packet(pVideoCodecCtx, pPacket.payload) < 0)
+    int response = avcodec_send_packet(pVideoCodecCtx, pPacket.payload);
+    if(response < 0)
     {
         throw runtime_error("Failed to decode a packet");
     }
-    if(int response = avcodec_receive_frame(pVideoCodecCtx, *frame);
+    while(response >= 0)
+    {
+        response = avcodec_receive_frame(pVideoCodecCtx, *frame);
+        if(response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+            return false;
+        else if(response < 0)
+            runtime_error("Failed to decode a packet");
+    }
+    if(response = avcodec_receive_frame(pVideoCodecCtx, *frame);
        response == AVERROR(EAGAIN) || response == AVERROR_EOF)
     {
         return false;
     }
     else if(response < 0)
     {
-        throw runtime_error("Failed to decode a packet");
     }
     return true;
 }
@@ -328,5 +347,18 @@ std::int64_t clip::video_reconvert_pts(const milliseconds& pts) const
 {
     const auto regTs = chrono::duration_cast<chrono::duration<double>>(pts - startsAt + startOffset);
     return regTs.count() * vidTimebase.den / (double)vidTimebase.num;
+}
+void clip::flush()
+{
+    // if(avcodec_send_packet(pVideoCodecCtx, NULL) < 0) return;
+    // AVFrame* f = av_frame_alloc();
+
+    // int ret = 0;
+    // while((ret = avcodec_receive_frame(pVideoCodecCtx, f) >= 0))
+    //     ;
+    // av_frame_free(&f);
+
+    avcodec_flush_buffers(pVideoCodecCtx);
+    avcodec_flush_buffers(pAudioCodecCtx);
 }
 }

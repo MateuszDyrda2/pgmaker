@@ -56,6 +56,7 @@ class clip
     void change_end_offset(const milliseconds& by);
 
     bool seek(const milliseconds& ts);
+    void flush();
     void reset();
 
     milliseconds audio_convert_pts(std::int64_t pts) const;
@@ -93,6 +94,6 @@ class clip
     bool open_codec(AVCodecParameters* codecParams, AVCodecContext** ctx);
     void fill_buffer();
     void seek_start();
-	bool seek_impl(const milliseconds& localTs);
+    bool seek_impl(const milliseconds& localTs);
 };
 }

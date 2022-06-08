@@ -8,45 +8,48 @@ main_application::~main_application()
 }
 void main_application::update()
 {
-    mainMenu.draw();
-    ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
-    ImGuiWindowFlags windowFlags      = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-    ////
-    const auto vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(vp->WorkPos);
-    ImGui::SetNextWindowSize(vp->WorkSize);
-    ImGui::SetNextWindowViewport(vp->ID);
-    windowFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-    windowFlags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    ////
-    if(dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
+    if(auto proj = project_manager::get_current_project())
     {
-        windowFlags |= ImGuiWindowFlags_NoBackground;
-    }
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
-
-    ImGui::Begin("MainDockSpace", nullptr, windowFlags);
-    {
-        ImGui::PopStyleVar(3);
-        auto dockspaceId = ImGui::GetID("MyDockspace");
-        if(ImGui::DockBuilderGetNode(dockspaceId) == NULL)
+        mainMenu.draw();
+        ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
+        ImGuiWindowFlags windowFlags      = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+        ////
+        const auto vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->WorkPos);
+        ImGui::SetNextWindowSize(vp->WorkSize);
+        ImGui::SetNextWindowViewport(vp->ID);
+        windowFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+        windowFlags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+        ////
+        if(dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
         {
-            initialize_layout(dockspaceId);
+            windowFlags |= ImGuiWindowFlags_NoBackground;
         }
-        else
-        {
-            ImGui::DockSpace(dockspaceId, ImVec2(0, 0), dockspaceFlags);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 
-            timeline.draw();
-            videos.draw();
-            properties.draw();
-            nodeEditor.draw();
-            playback.draw();
+        ImGui::Begin("MainDockSpace", nullptr, windowFlags);
+        {
+            ImGui::PopStyleVar(3);
+            auto dockspaceId = ImGui::GetID("MyDockspace");
+            if(ImGui::DockBuilderGetNode(dockspaceId) == NULL)
+            {
+                initialize_layout(dockspaceId);
+            }
+            else
+            {
+                ImGui::DockSpace(dockspaceId, ImVec2(0, 0), dockspaceFlags);
+
+                timeline.draw();
+                videos.draw();
+                properties.draw();
+                nodeEditor.draw();
+                playback.draw();
+            }
         }
+        ImGui::End();
     }
-    ImGui::End();
 }
 
 void main_application::initialize_layout(ImGuiID dockspaceId)

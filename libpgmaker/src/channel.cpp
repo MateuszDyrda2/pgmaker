@@ -247,13 +247,31 @@ void channel::video_job()
         }
         nbNoop = 0;
         auto c = _packet.owner;
-        if(c->get_frame(_packet, &pFrame))
+        ////
+        int response = avcodec_send_packet(c->pVideoCodecCtx, _packet.payload);
+        if(response < 0) throw runtime_error("ASDASD");
+        while(response >= 0)
         {
-            auto fr = new frame;
-            c->convert_frame(pFrame, &fr);
-            while(!stopped && !frameQueue.wait_enqueue_timed(fr, 10ms))
-                ;
+            response = avcodec_receive_frame(c->pVideoCodecCtx, pFrame);
+            if(response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+                break;
+            else if(response < 0)
+                throw runtime_error("ASDA");
+            if(response >= 0)
+            {
+                auto fr = new frame;
+                c->convert_frame(pFrame, &fr);
+                while(!stopped && !frameQueue.wait_enqueue_timed(fr, 10ms))
+                    ;
+            }
         }
+        // if(c->get_frame(_packet, &pFrame))
+        //{
+        //     auto fr = new frame;
+        //     c->convert_frame(pFrame, &fr);
+        //     while(!stopped && !frameQueue.wait_enqueue_timed(fr, 10ms))
+        //         ;
+        // }
     }
     av_frame_free(&pFrame);
 }

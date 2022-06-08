@@ -129,7 +129,6 @@ else()
     set(GLM_LIB glm)
 endif()
 
-
 target_link_libraries(libpgmaker
 	PUBLIC
 	${FFMPEG_LIBS}
