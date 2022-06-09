@@ -64,7 +64,10 @@ class video_reader
         clip_params inParams, outParams;
         streaming_params streamingParams;
         std::function<void(void*, void*, int, int)> effect;
-        uint8_t *inBuffer, *outBuffer;
+        AVFrame *inBuffer, *outBuffer;
+        unsigned int inTexs[4];
+        unsigned int outTexs[4];
+        unsigned int programID;
     };
 
   public:

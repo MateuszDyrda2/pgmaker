@@ -81,7 +81,7 @@ else()
 endif()
 
 
-add_subdirectory(lib/glad)
+add_subdirectory(lib/glad2)
 add_subdirectory(lib/glm)
 add_subdirectory(lib/portaudio)
 

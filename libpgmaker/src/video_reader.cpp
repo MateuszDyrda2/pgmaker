@@ -1,16 +1,31 @@
 #include <libpgmaker/video_reader.h>
 
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <stdexcept>
 
-#include <cstdint>
+#include <glad/glad.h>
 
 namespace libpgmaker {
 using namespace std;
 namespace fs = filesystem;
+void GLAPIENTRY
+message_callback(
+    GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei lenght,
+    const GLchar* message,
+    const void* userParams)
+{
+    fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+            (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
+            type, severity, message);
+}
 inline bool file_exists(const std::string& path)
 {
     ifstream f(path);
@@ -37,6 +52,8 @@ video_reader::video_handle::video_handle(AVFormatContext* ctx, const std::string
     pFormatContext(ctx), pCodecContext{}, vsIndex{ -1 },
     info{}, thumbnail{}
 {
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(message_callback, 0);
     info.path = path;
 }
 video_reader::video_handle::~video_handle()
@@ -228,10 +245,114 @@ void video_reader::video_copier::open_input(const std::string& path)
     inParams.videoIndex    = videoIndex;
     inParams.audioIndex    = audioIndex;
 
-    inParams.swsCtx = nullptr;
-    inParams.swsCtx = sws_getCachedContext(inParams.swsCtx, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height,
-                                           inParams.videoCodecCtx->pix_fmt, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height,
-                                           AV_PIX_FMT_RGB0, SWS_BILINEAR, NULL, NULL, NULL);
+    inParams.swsCtx  = nullptr;
+    inParams.swsCtx  = sws_getCachedContext(inParams.swsCtx, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height,
+                                            inParams.videoCodecCtx->pix_fmt, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height,
+                                            AV_PIX_FMT_GBRAPF32, SWS_BILINEAR, NULL, NULL, NULL);
+    inBuffer         = av_frame_alloc();
+    inBuffer->width  = inParams.videoCodecCtx->width;
+    inBuffer->height = inParams.videoCodecCtx->height;
+    inBuffer->format = AV_PIX_FMT_GBRAPF32;
+    // inBuffer->linesize[0] = 4 * sizeof(float) * inBuffer->width;
+    if(av_frame_get_buffer(inBuffer, 0) != 0)
+    {
+        throw runtime_error("Failed to alloc buffer");
+    }
+
+    outBuffer         = av_frame_alloc();
+    outBuffer->width  = inParams.videoCodecCtx->width;
+    outBuffer->height = inParams.videoCodecCtx->height;
+    // outBuffer->linesize[0] = 4 * sizeof(float) * outBuffer->width;
+    outBuffer->format = AV_PIX_FMT_GBRAPF32;
+    if(av_frame_get_buffer(outBuffer, 0) != 0)
+    {
+        throw runtime_error("Failed to alloc buffer");
+    }
+
+    glGenTextures(4, inTexs);
+    for(int i = 0; i < 4; ++i)
+    {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, inTexs[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height, 0, GL_RED, GL_FLOAT, 0);
+    }
+    glGenTextures(4, outTexs);
+    for(int i = 0; i < 4; ++i)
+    {
+        glActiveTexture(GL_TEXTURE4 + i);
+        glBindTexture(GL_TEXTURE_2D, outTexs[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height, 0, GL_RED, GL_FLOAT, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    const char* shaderSource = R"(
+		#version 430 core
+		layout (local_size_x = 1, local_size_y = 1) in;
+
+		layout (location = 0, binding = 0, r32f) uniform readonly image2D inImageB;
+		layout (location = 1, binding = 1, r32f) uniform readonly image2D inImageG;
+		layout (location = 2, binding = 2, r32f) uniform readonly image2D inImageR;
+		layout (location = 3, binding = 3, r32f) uniform readonly image2D inImageA;
+
+		layout (location = 4, binding = 4, r32f) uniform writeonly image2D outImageB;
+		layout (location = 5, binding = 5, r32f) uniform writeonly image2D outImageG;
+		layout (location = 6, binding = 6, r32f) uniform writeonly image2D outImageR;
+		layout (location = 7, binding = 7, r32f) uniform writeonly image2D outImageA;
+
+		void main()
+		{
+			ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
+			vec4 pixelB = imageLoad(inImageB, coords);
+			vec4 pixelG = imageLoad(inImageG, coords);
+			vec4 pixelR = imageLoad(inImageR, coords);
+			vec4 pixelA = imageLoad(inImageA, coords);
+			float Y = 0.299 * pixelR.x + 0.587 * pixelG.x + 0.114 * pixelB.x;
+			pixelB = vec4(Y, pixelB.yzw);
+			pixelG = vec4(Y, pixelG.yzw);
+			pixelR = vec4(Y, pixelR.yzw);
+			imageStore(outImageB, coords, pixelB);
+			imageStore(outImageG, coords, pixelG);
+			imageStore(outImageR, coords, pixelR);
+			imageStore(outImageA, coords, pixelA);
+		}
+	)";
+    int computeShader        = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(computeShader, 1, &shaderSource, NULL);
+    glCompileShader(computeShader);
+    GLint ret = 0;
+    glGetShaderiv(computeShader, GL_COMPILE_STATUS, &ret);
+    if(ret == GL_FALSE)
+    {
+        GLint maxLenght = 0;
+        glGetShaderiv(computeShader, GL_INFO_LOG_LENGTH, &maxLenght);
+        std::vector<GLchar> errorLog(maxLenght);
+        glGetShaderInfoLog(computeShader, maxLenght, &maxLenght, &errorLog[0]);
+        printf("%s", errorLog.data());
+        glDeleteShader(computeShader);
+        return;
+    }
+    programID = glCreateProgram();
+    glAttachShader(programID, computeShader);
+    glLinkProgram(programID);
+    glGetProgramiv(programID, GL_LINK_STATUS, &ret);
+    if(ret == GL_FALSE)
+    {
+        GLint maxLenght = 0;
+        glGetProgramiv(programID, GL_INFO_LOG_LENGTH, &maxLenght);
+        std::vector<GLchar> errorLog(maxLenght);
+        glGetProgramInfoLog(programID, maxLenght, &maxLenght, &errorLog[0]);
+        printf("%s", errorLog.data());
+        glDeleteProgram(programID);
+    }
+    glDeleteShader(computeShader);
 }
 void video_reader::video_copier::open_output(const std::string& path)
 {
@@ -281,14 +402,11 @@ void video_reader::video_copier::prepare_video_encoder()
     avcodec_parameters_from_context(outParams.videoStream->codecpar, outParams.videoCodecCtx);
     outParams.swsCtx = nullptr;
     outParams.swsCtx = sws_getCachedContext(outParams.swsCtx, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height,
-                                            AV_PIX_FMT_RGB0, outParams.videoCodecCtx->width, outParams.videoCodecCtx->height,
+                                            AV_PIX_FMT_GBRAPF32, outParams.videoCodecCtx->width, outParams.videoCodecCtx->height,
                                             outParams.videoCodecCtx->pix_fmt, SWS_BILINEAR, NULL, NULL, NULL);
 }
 void video_reader::video_copier::process()
 {
-    inBuffer  = new uint8_t[inParams.videoCodecCtx->width * inParams.videoCodecCtx->height * 4];
-    outBuffer = new uint8_t[inParams.videoCodecCtx->width * inParams.videoCodecCtx->height * 4];
-
     AVDictionary* muxer_opts = NULL;
     av_dict_set(&muxer_opts, streamingParams.muxer_opt_key, streamingParams.muxer_opt_value, 0);
 
@@ -356,19 +474,43 @@ void video_reader::video_copier::encode_video(AVFrame* inputFrame)
     if(inputFrame)
     {
         inputFrame->pict_type = AV_PICTURE_TYPE_NONE;
-
-        std::uint8_t* dest[4] = { inBuffer, nullptr, nullptr, nullptr };
-        int destLineSize[4]   = { int(inParams.videoCodecCtx->width) * 4, 0, 0, 0 };
         sws_scale(inParams.swsCtx, inputFrame->data, inputFrame->linesize,
                   0, inputFrame->height,
-                  dest, destLineSize);
+                  inBuffer->data, inBuffer->linesize);
 
         ///////////////////////////////////////////////////////////////////
-        ///////////////////////////////////////////////////////////////////
         ///////////////// RGBA - apply filter /////////////////////////////
-        effect(outBuffer, inBuffer, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height);
-        ///////////////////////////////////////////////////////////////////
-        ///////////////////////////////////////////////////////////////////
+        // std::copy_n(inBuffer->data[0], inBuffer->linesize[0] * inBuffer->height, outBuffer->data[0]);
+        // std::copy_n(inBuffer->data[1], inBuffer->linesize[1] * inBuffer->height, outBuffer->data[1]);
+        // std::copy_n(inBuffer->data[2], inBuffer->linesize[2] * inBuffer->height, outBuffer->data[2]);
+        // std::copy_n(inBuffer->data[3], inBuffer->linesize[3] * inBuffer->height, outBuffer->data[3]);
+
+        glUseProgram(programID);
+        for(int i = 0; i < 4; ++i)
+        {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, inTexs[i]);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, inBuffer->width, inBuffer->height, GL_RED, GL_FLOAT, inBuffer->data[i]);
+            glUniform1i(i, i);
+            glBindImageTexture(i, inTexs[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+        }
+        for(int i = 0; i < 4; ++i)
+        {
+            glActiveTexture(GL_TEXTURE4 + i);
+            glBindTexture(GL_TEXTURE_2D, outTexs[i]);
+            glUniform1i(4 + i, 4 + i);
+            glBindImageTexture(4 + i, outTexs[i], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+        }
+        glDispatchCompute(inBuffer->width, inBuffer->height, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        for(int i = 0; i < 4; ++i)
+        {
+            glActiveTexture(GL_TEXTURE4 + i);
+            glBindTexture(GL_TEXTURE_2D, outTexs[i]);
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, outBuffer->data[i]);
+        }
+
         ///////////////////////////////////////////////////////////////////
         static size_t nFrames = 0;
         outFrame              = av_frame_alloc();
@@ -383,10 +525,8 @@ void video_reader::video_copier::encode_video(AVFrame* inputFrame)
         {
             throw runtime_error("ADA");
         }
-        dest[0] = outBuffer;
-
-        sws_scale(outParams.swsCtx, dest, destLineSize,
-                  0, inParams.videoCodecCtx->height,
+        sws_scale(outParams.swsCtx, outBuffer->data, outBuffer->linesize,
+                  0, outBuffer->height,
                   outFrame->data, outFrame->linesize);
     }
 
