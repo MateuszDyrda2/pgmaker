@@ -89,7 +89,7 @@ project::project(const std::filesystem::path& path,
     video_reader::copy_with_effect(
         "/home/matzix/shared/PGMaker/build/assets/20220601_180450.mp4",
         "/home/matzix/shared/PGMaker/build/tmp/20220601_180450tmp.mp4",
-        std::function([](void*, void*, int, int) {}));
+        new grayscale);
 }
 project::project(const std::filesystem::path& path):
     videos(),

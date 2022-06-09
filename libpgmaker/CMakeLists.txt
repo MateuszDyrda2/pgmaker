@@ -114,6 +114,7 @@ set(libpgmaker_SRC
 	src/timeline.cpp
 	src/video.cpp
 	src/pg_types.cpp
+	src/effect.cpp
 )
 add_library(libpgmaker STATIC ${libpgmaker_SRC})
 

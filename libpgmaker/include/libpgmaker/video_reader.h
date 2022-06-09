@@ -3,6 +3,7 @@
 #include "video.h"
 #include <libpgmaker/pg_types.h>
 
+#include "effect.h"
 #include <functional>
 #include <memory>
 #include <string>
@@ -33,7 +34,7 @@ class video_reader
 
     struct video_copier
     {
-        video_copier(const std::function<void(void*, void*, int, int)>& effect);
+        video_copier(effect* ef);
         void open_input(const std::string& path);
         void open_output(const std::string& path);
         void process();
@@ -63,11 +64,8 @@ class video_reader
         };
         clip_params inParams, outParams;
         streaming_params streamingParams;
-        std::function<void(void*, void*, int, int)> effect;
+        effect* ef;
         AVFrame *inBuffer, *outBuffer;
-        unsigned int inTexs[4];
-        unsigned int outTexs[4];
-        unsigned int programID;
     };
 
   public:
@@ -76,6 +74,6 @@ class video_reader
     static void copy_with_effect(
         const std::string& in,
         const std::string& out,
-        const std::function<void(void*, void*, int, int)>& effect);
+        effect* ef);
 };
 } // namespace libpgmaker

@@ -12,20 +12,6 @@
 namespace libpgmaker {
 using namespace std;
 namespace fs = filesystem;
-void GLAPIENTRY
-message_callback(
-    GLenum source,
-    GLenum type,
-    GLuint id,
-    GLenum severity,
-    GLsizei lenght,
-    const GLchar* message,
-    const void* userParams)
-{
-    fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
-            (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
-            type, severity, message);
-}
 inline bool file_exists(const std::string& path)
 {
     ifstream f(path);
@@ -52,8 +38,6 @@ video_reader::video_handle::video_handle(AVFormatContext* ctx, const std::string
     pFormatContext(ctx), pCodecContext{}, vsIndex{ -1 },
     info{}, thumbnail{}
 {
-    glEnable(GL_DEBUG_OUTPUT);
-    glDebugMessageCallback(message_callback, 0);
     info.path = path;
 }
 video_reader::video_handle::~video_handle()
@@ -184,15 +168,15 @@ shared_ptr<video> video_reader::video_handle::get()
 void video_reader::copy_with_effect(
     const std::string& in,
     const std::string& out,
-    const std::function<void(void*, void*, int, int)>& effect)
+    effect* ef)
 {
-    video_copier cpr(effect);
+    video_copier cpr(ef);
     cpr.open_input(in);
     cpr.open_output(out);
     cpr.process();
 }
-video_reader::video_copier::video_copier(const std::function<void(void*, void*, int, int)>& effect):
-    effect(effect)
+video_reader::video_copier::video_copier(effect* ef):
+    ef(ef)
 {
     streamingParams.video_codec      = "libx264";
     streamingParams.codec_priv_key   = "x264-params";
@@ -268,91 +252,8 @@ void video_reader::video_copier::open_input(const std::string& path)
     {
         throw runtime_error("Failed to alloc buffer");
     }
-
-    glGenTextures(4, inTexs);
-    for(int i = 0; i < 4; ++i)
-    {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, inTexs[i]);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height, 0, GL_RED, GL_FLOAT, 0);
-    }
-    glGenTextures(4, outTexs);
-    for(int i = 0; i < 4; ++i)
-    {
-        glActiveTexture(GL_TEXTURE4 + i);
-        glBindTexture(GL_TEXTURE_2D, outTexs[i]);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height, 0, GL_RED, GL_FLOAT, 0);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-
-    const char* shaderSource = R"(
-		#version 430 core
-		layout (local_size_x = 1, local_size_y = 1) in;
-
-		layout (location = 0, binding = 0, r32f) uniform readonly image2D inImageB;
-		layout (location = 1, binding = 1, r32f) uniform readonly image2D inImageG;
-		layout (location = 2, binding = 2, r32f) uniform readonly image2D inImageR;
-		layout (location = 3, binding = 3, r32f) uniform readonly image2D inImageA;
-
-		layout (location = 4, binding = 4, r32f) uniform writeonly image2D outImageB;
-		layout (location = 5, binding = 5, r32f) uniform writeonly image2D outImageG;
-		layout (location = 6, binding = 6, r32f) uniform writeonly image2D outImageR;
-		layout (location = 7, binding = 7, r32f) uniform writeonly image2D outImageA;
-
-		void main()
-		{
-			ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
-			vec4 pixelB = imageLoad(inImageB, coords);
-			vec4 pixelG = imageLoad(inImageG, coords);
-			vec4 pixelR = imageLoad(inImageR, coords);
-			vec4 pixelA = imageLoad(inImageA, coords);
-			float Y = 0.299 * pixelR.x + 0.587 * pixelG.x + 0.114 * pixelB.x;
-			pixelB = vec4(Y, pixelB.yzw);
-			pixelG = vec4(Y, pixelG.yzw);
-			pixelR = vec4(Y, pixelR.yzw);
-			imageStore(outImageB, coords, pixelB);
-			imageStore(outImageG, coords, pixelG);
-			imageStore(outImageR, coords, pixelR);
-			imageStore(outImageA, coords, pixelA);
-		}
-	)";
-    int computeShader        = glCreateShader(GL_COMPUTE_SHADER);
-    glShaderSource(computeShader, 1, &shaderSource, NULL);
-    glCompileShader(computeShader);
-    GLint ret = 0;
-    glGetShaderiv(computeShader, GL_COMPILE_STATUS, &ret);
-    if(ret == GL_FALSE)
-    {
-        GLint maxLenght = 0;
-        glGetShaderiv(computeShader, GL_INFO_LOG_LENGTH, &maxLenght);
-        std::vector<GLchar> errorLog(maxLenght);
-        glGetShaderInfoLog(computeShader, maxLenght, &maxLenght, &errorLog[0]);
-        printf("%s", errorLog.data());
-        glDeleteShader(computeShader);
-        return;
-    }
-    programID = glCreateProgram();
-    glAttachShader(programID, computeShader);
-    glLinkProgram(programID);
-    glGetProgramiv(programID, GL_LINK_STATUS, &ret);
-    if(ret == GL_FALSE)
-    {
-        GLint maxLenght = 0;
-        glGetProgramiv(programID, GL_INFO_LOG_LENGTH, &maxLenght);
-        std::vector<GLchar> errorLog(maxLenght);
-        glGetProgramInfoLog(programID, maxLenght, &maxLenght, &errorLog[0]);
-        printf("%s", errorLog.data());
-        glDeleteProgram(programID);
-    }
-    glDeleteShader(computeShader);
+    auto width = inParams.videoCodecCtx->width, height = inParams.videoCodecCtx->height;
+    ef->prepare(width, height);
 }
 void video_reader::video_copier::open_output(const std::string& path)
 {
@@ -444,7 +345,8 @@ void video_reader::video_copier::process()
 
     avcodec_free_context(&inParams.videoCodecCtx);
     avcodec_free_context(&inParams.audioCodecCtx);
-
+    // ef->cleanup();
+    delete ef;
     delete[] inBuffer;
     delete[] outBuffer;
 }
@@ -484,32 +386,7 @@ void video_reader::video_copier::encode_video(AVFrame* inputFrame)
         // std::copy_n(inBuffer->data[1], inBuffer->linesize[1] * inBuffer->height, outBuffer->data[1]);
         // std::copy_n(inBuffer->data[2], inBuffer->linesize[2] * inBuffer->height, outBuffer->data[2]);
         // std::copy_n(inBuffer->data[3], inBuffer->linesize[3] * inBuffer->height, outBuffer->data[3]);
-
-        glUseProgram(programID);
-        for(int i = 0; i < 4; ++i)
-        {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, inTexs[i]);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, inBuffer->width, inBuffer->height, GL_RED, GL_FLOAT, inBuffer->data[i]);
-            glUniform1i(i, i);
-            glBindImageTexture(i, inTexs[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
-        }
-        for(int i = 0; i < 4; ++i)
-        {
-            glActiveTexture(GL_TEXTURE4 + i);
-            glBindTexture(GL_TEXTURE_2D, outTexs[i]);
-            glUniform1i(4 + i, 4 + i);
-            glBindImageTexture(4 + i, outTexs[i], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
-        }
-        glDispatchCompute(inBuffer->width, inBuffer->height, 1);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-        for(int i = 0; i < 4; ++i)
-        {
-            glActiveTexture(GL_TEXTURE4 + i);
-            glBindTexture(GL_TEXTURE_2D, outTexs[i]);
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, outBuffer->data[i]);
-        }
+        ef->process(inBuffer, outBuffer);
 
         ///////////////////////////////////////////////////////////////////
         static size_t nFrames = 0;
