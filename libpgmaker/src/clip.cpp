@@ -36,6 +36,23 @@ clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
 }
 clip::~clip()
 {
+    close_input();
+}
+void clip::change_video(const std::shared_ptr<video>& newVideo)
+{
+    vid = newVideo;
+    assert(vid);
+    close_input();
+    open_input(vid->get_info().path);
+    audioFrame = av_frame_alloc();
+}
+void clip::add_effect_video(const std::shared_ptr<video>& newVideo)
+{
+    hasEffect = true;
+    change_video(newVideo);
+}
+void clip::close_input()
+{
     av_frame_free(&audioFrame);
     swr_free(&swrCtx);
     sws_freeContext(swsCtx);
@@ -43,6 +60,15 @@ clip::~clip()
     avcodec_free_context(&pAudioCodecCtx);
     avformat_close_input(&pFormatCtx);
     avformat_free_context(pFormatCtx);
+
+    audioFrame          = nullptr;
+    swrCtx              = nullptr;
+    swsCtx              = nullptr;
+    pVideoCodecCtx      = nullptr;
+    pAudioCodecCtx      = nullptr;
+    pFormatCtx          = nullptr;
+    vidCurrentStreamPos = 0;
+    vidCurrentTs        = 0;
 }
 void clip::open_input(const string& path)
 {

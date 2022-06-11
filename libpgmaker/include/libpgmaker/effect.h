@@ -7,6 +7,14 @@ namespace libpgmaker {
 class effect
 {
   public:
+    static constexpr char const* effectNames[] = { "none", "Grayscale" };
+    enum class effect_type
+    {
+        None,
+        Grayscale
+    };
+
+  public:
     virtual void prepare(int width, int height)               = 0;
     virtual void process(AVFrame* inFrame, AVFrame* outFrame) = 0;
     virtual void cleanup()                                    = 0;

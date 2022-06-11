@@ -4,6 +4,7 @@
 #include <string>
 
 #include "video_manager.h"
+#include <libpgmaker/effect.h>
 
 #include <filesystem>
 #include <libpgmaker/timeline.h>
@@ -40,6 +41,8 @@ class project
 
     libpgmaker::timeline& get_timeline();
     const libpgmaker::timeline& get_timeline() const;
+
+    void add_effect(size_t channel, size_t clip, libpgmaker::effect::effect_type type);
 
     const auto& get_size() const { return size; }
 

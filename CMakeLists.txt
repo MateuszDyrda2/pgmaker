@@ -46,6 +46,7 @@ add_executable(pgmaker
 	src/timeline_panel.cpp
 	src/playback_panel.cpp
 	src/node_editor_panel.cpp
+	src/node_editor/block_editor.cpp
 	src/project.cpp
 	src/main_application.cpp
 	src/welcome_screen.cpp

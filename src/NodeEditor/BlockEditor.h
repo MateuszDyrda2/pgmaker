@@ -20,34 +20,26 @@ class BlockEditor
     float lastY;
 
   public:
-    BlockEditor(float _x, float _y, int numberOfInputAndOutputBlocks):
+    BlockEditor(float _x, float _y):
         x(_x), y(_y), draggedBlock(nullptr)
     {
         lastY = _y;
-        for(int i = 0; i < numberOfInputAndOutputBlocks; i++)
-        {
-            lastY += 100;
-            inputBlocks.push_back(std::make_shared<InputBlock>(ImVec2{ x, lastY }, 100, 25, 0xFF00FF7F));
-            outputBlocks.push_back(std::make_shared<OutputBlock>(ImVec2{ x + 800, lastY }, 100, 25, 0xFF00FF7F));
-            auto& ib = inputBlocks.back();
-            auto& ob = outputBlocks.back();
-            ob->setInputBlock(ib);
-            ib->addConnector(ob->getConnector());
-            // filterBlocks.push_back(std::make_shared<FilterBlock>(ImVec2{ x + 400, y + i * 100 }, 100, 25, 0xFF00FF7F));
-        }
         event_handler::subscribe(
             "TimelineClipAppended",
-            std::function<void()>([this]() {
-                lastY += 100;
-                inputBlocks.push_back(std::make_shared<InputBlock>(ImVec2(x, lastY), 100, 25, 0xFF00FF7F));
-                outputBlocks.push_back(std::make_shared<OutputBlock>(ImVec2(x + 800, lastY), 100, 25, 0xFF00FF7F));
-                auto& ib = inputBlocks.back();
-                auto& ob = outputBlocks.back();
-                ob->setInputBlock(ib);
-                ib->addConnector(ob->getConnector());
+            std::function<void(size_t, size_t)>([this](size_t channelIdx, size_t clipHandle) {
+                this->add_block_pair(channelIdx, clipHandle);
             }));
     }
-
+    void add_block_pair(size_t channelIdx, size_t clipHandle)
+    {
+        lastY += 100;
+        inputBlocks.push_back(std::make_shared<InputBlock>(ImVec2(x, lastY), 100, 25, 0xFF00FF7F));
+        outputBlocks.push_back(std::make_shared<OutputBlock>(ImVec2(x + 800, lastY), 100, 25, 0xFF00FF7F));
+        auto& ib = inputBlocks.back();
+        auto& ob = outputBlocks.back();
+        ob->setInputBlock(ib);
+        ib->addConnector(ob->getConnector());
+    }
     void interact()
     {
         auto& io = ImGui::GetIO();

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "NodeEditor/BlockEditor.h"
+//#include "NodeEditor/BlockEditor.h"
+#include "node_editor/block_editor.h"
 #include "panel.h"
 
 class node_editor_panel : public panel
@@ -11,5 +12,6 @@ class node_editor_panel : public panel
     void draw() override;
 
   private:
-    std::unique_ptr<BlockEditor> blockEditor;
+    // std::unique_ptr<BlockEditor> blockEditor;
+    block_editor editor;
 };

@@ -2,6 +2,7 @@
 
 #include "panel.h"
 
+#include <libpgmaker/effect.h>
 #include <libpgmaker/timeline.h>
 
 class timeline_panel : public panel

@@ -42,10 +42,10 @@ class channel
     ~channel();
 
     void set_timeline(const timeline* tl);
-    clip* get_clip(std::size_t index);
-    const clip* get_clip(std::size_t index) const;
-    clip* operator[](std::size_t index);
-    const clip* operator[](std::size_t index) const;
+    clip* get_clip(std::size_t clipId);
+    const clip* get_clip(std::size_t clipId) const;
+    clip* operator[](std::size_t clipId);
+    const clip* operator[](std::size_t clipId) const;
     std::deque<std::unique_ptr<clip>>& get_clips();
     const std::deque<std::unique_ptr<clip>>& get_clips() const;
     milliseconds get_duration() const { return lenght; }

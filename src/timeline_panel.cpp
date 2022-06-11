@@ -31,7 +31,8 @@ timeline_panel::timeline_panel():
         [&tl](command& c) {
             auto&& [index, vid] = *reinterpret_cast<std::pair<std::size_t, std::shared_ptr<video>>*>(c.data);
             tl.append_clip(index, vid);
-            event_handler::fire_event("TimelineClipAppended");
+            auto j = tl.get_channel(index)->get_clips().back()->get_id();
+            event_handler::fire_event("TimelineClipAppended", index, j);
         });
     command_handler::listen(
         "TimelineMoveClip",
@@ -53,6 +54,13 @@ timeline_panel::timeline_panel():
             auto&& [i, j, by] = *reinterpret_cast<
                 std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>*>(c.data);
             tl.get_channel(i)->get_clip(j)->change_end_offset(by);
+        });
+    command_handler::listen(
+        "AttachEffect",
+        [proj](command& c) {
+            auto&& [i, j, type] = *reinterpret_cast<
+                std::tuple<std::size_t, std::size_t, effect::effect_type>*>(c.data);
+            proj->add_effect(i, j, type);
         });
 }
 timeline_panel::~timeline_panel()
@@ -262,7 +270,8 @@ void timeline_panel::handle_mov(const std::unique_ptr<libpgmaker::clip>& cl,
         auto inDur = ((newClipXmin - xmin) / (xmax - xmin)) * timemax;
         command_handler::send(
             { "TimelineMoveClip",
-              new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(i, j, std::int64_t(inDur)) });
+              new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(
+                  i, cl->get_id(), std::int64_t(inDur)) });
     }
 }
 void timeline_panel::handle_cut(const std::unique_ptr<libpgmaker::clip>& cl,
@@ -295,8 +304,10 @@ void timeline_panel::handle_cut(const std::unique_ptr<libpgmaker::clip>& cl,
         auto ts  = std::chrono::milliseconds(
              std::int64_t(timemax * (mousex - (xmin + canvasPos.x)) / (xmax - xmin)));
         auto offset = ts - cl->get_starts_at();
-        command_handler::send({ "TimelineClipStartOffset",
-                                new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(i, j, offset) });
+        command_handler::send(
+            { "TimelineClipStartOffset",
+              new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(
+                  i, cl->get_id(), offset) });
     }
     else if(backCut && !isMouseDragging && cutIndex == cl->get_id())
     {
@@ -304,7 +315,9 @@ void timeline_panel::handle_cut(const std::unique_ptr<libpgmaker::clip>& cl,
         auto ts = std::chrono::milliseconds(
             std::int64_t(timemax * (mousex - (xmin + canvasPos.x)) / (xmax - xmin)));
         auto offset = (cl->get_starts_at() + cl->get_duration()) - ts;
-        command_handler::send({ "TimelineClipEndOffset",
-                                new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(i, j, offset) });
+        command_handler::send(
+            { "TimelineClipEndOffset",
+              new std::tuple<std::size_t, std::size_t, std::chrono::milliseconds>(
+                  i, cl->get_id(), offset) });
     }
 }

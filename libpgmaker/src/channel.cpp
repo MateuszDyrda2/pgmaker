@@ -65,25 +65,31 @@ bool channel::append_clip(const std::shared_ptr<video>& vid)
 {
     return add_clip(vid, lenght);
 }
-clip* channel::get_clip(std::size_t index)
+clip* channel::get_clip(std::size_t clipId)
 {
-    auto it = clips.begin();
-    std::advance(it, index);
-    return it->get();
+    auto ret = std::find_if(clips.begin(), clips.end(), [clipId](const auto& cl) {
+        return cl->get_id() == clipId;
+    });
+    if(ret == clips.end())
+        return nullptr;
+    return ret->get();
 }
-const clip* channel::get_clip(std::size_t index) const
+const clip* channel::get_clip(std::size_t clipId) const
 {
-    auto it = clips.begin();
-    std::advance(it, index);
-    return it->get();
+    auto ret = std::find_if(clips.begin(), clips.end(), [clipId](const auto& cl) {
+        return cl->get_id() == clipId;
+    });
+    if(ret == clips.end())
+        return nullptr;
+    return ret->get();
 }
-clip* channel::operator[](std::size_t index)
+clip* channel::operator[](std::size_t clipId)
 {
-    return get_clip(index);
+    return get_clip(clipId);
 }
-const clip* channel::operator[](std::size_t index) const
+const clip* channel::operator[](std::size_t clipId) const
 {
-    return get_clip(index);
+    return get_clip(clipId);
 }
 std::deque<std::unique_ptr<clip>>& channel::get_clips()
 {
@@ -394,10 +400,8 @@ int channel::audio_stream_callback(
 
 void channel::move_clip(std::size_t index, const milliseconds& to)
 {
-    assert(index < clips.size());
-
     if(to < 0ms) return;
-    auto cl = std::next(clips.begin(), index)->get();
+    auto cl = get_clip(index);
 
     auto end     = to + cl->get_duration();
     auto canMove = std::find_if(

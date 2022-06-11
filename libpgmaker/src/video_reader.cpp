@@ -278,11 +278,11 @@ void video_reader::video_copier::prepare_video_encoder()
     AVRational inputFramerate = av_guess_frame_rate(inParams.avfm, inParams.videoStream, NULL);
     //
     outParams.videoStream   = avformat_new_stream(outParams.avfm, NULL);
-    outParams.videoCodec    = avcodec_find_encoder_by_name(streamingParams.video_codec);
+    outParams.videoCodec    = avcodec_find_encoder_by_name(streamingParams.video_codec.c_str());
     outParams.videoCodecCtx = avcodec_alloc_context3(outParams.videoCodec);
     AVDictionary* dict      = NULL;
     av_opt_set(dict, "preset", "fast", 0);
-    av_opt_set(dict, streamingParams.codec_priv_key, streamingParams.codec_priv_value, 0);
+    av_opt_set(dict, streamingParams.codec_priv_key.c_str(), streamingParams.codec_priv_value.c_str(), 0);
 
     outParams.videoCodecCtx->height              = inParams.videoCodecCtx->height;
     outParams.videoCodecCtx->width               = inParams.videoCodecCtx->width;
@@ -292,13 +292,8 @@ void video_reader::video_copier::prepare_video_encoder()
     else
         outParams.videoCodecCtx->pix_fmt = inParams.videoCodecCtx->pix_fmt;
 
-    // outParams.videoCodecCtx->bit_rate       = 2'000'000;
-    // outParams.videoCodecCtx->rc_min_rate    = 2'000'000;
-    // outParams.videoCodecCtx->rc_max_rate    = 5'000'000;
-    // outParams.videoCodecCtx->rc_buffer_size = 4'000'000;
     outParams.videoStream->time_base = outParams.videoCodecCtx->time_base = av_inv_q(inputFramerate);
     outParams.videoStream->r_frame_rate                                   = inParams.videoStream->r_frame_rate;
-    // outParams.videoStream->time_base = outParams.videoCodecCtx->time_base = av_inv_q(inParams.videoCodecCtx->framerate);
     if(avcodec_open2(outParams.videoCodecCtx, outParams.videoCodec, &dict) < 0) throw runtime_error("ASDASD");
     avcodec_parameters_from_context(outParams.videoStream->codecpar, outParams.videoCodecCtx);
     outParams.swsCtx = nullptr;
@@ -309,7 +304,7 @@ void video_reader::video_copier::prepare_video_encoder()
 void video_reader::video_copier::process()
 {
     AVDictionary* muxer_opts = NULL;
-    av_dict_set(&muxer_opts, streamingParams.muxer_opt_key, streamingParams.muxer_opt_value, 0);
+    av_dict_set(&muxer_opts, streamingParams.muxer_opt_key.c_str(), streamingParams.muxer_opt_value.c_str(), 0);
 
     if(avformat_write_header(outParams.avfm, &muxer_opts) < 0) throw runtime_error("ASDASD");
     auto inputFrame  = av_frame_alloc();
@@ -321,7 +316,6 @@ void video_reader::video_copier::process()
         {
             transcode_video(inputPacket, inputFrame);
             av_packet_unref(inputPacket);
-            // remux(inputPacket, inParams.videoStream->time_base, outParams.videoStream->time_base);
         }
         else if(inParams.avfm->streams[inputPacket->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
@@ -345,7 +339,7 @@ void video_reader::video_copier::process()
 
     avcodec_free_context(&inParams.videoCodecCtx);
     avcodec_free_context(&inParams.audioCodecCtx);
-    // ef->cleanup();
+    ef->cleanup();
     delete ef;
     delete[] inBuffer;
     delete[] outBuffer;
@@ -382,10 +376,6 @@ void video_reader::video_copier::encode_video(AVFrame* inputFrame)
 
         ///////////////////////////////////////////////////////////////////
         ///////////////// RGBA - apply filter /////////////////////////////
-        // std::copy_n(inBuffer->data[0], inBuffer->linesize[0] * inBuffer->height, outBuffer->data[0]);
-        // std::copy_n(inBuffer->data[1], inBuffer->linesize[1] * inBuffer->height, outBuffer->data[1]);
-        // std::copy_n(inBuffer->data[2], inBuffer->linesize[2] * inBuffer->height, outBuffer->data[2]);
-        // std::copy_n(inBuffer->data[3], inBuffer->linesize[3] * inBuffer->height, outBuffer->data[3]);
         ef->process(inBuffer, outBuffer);
 
         ///////////////////////////////////////////////////////////////////
@@ -394,7 +384,6 @@ void video_reader::video_copier::encode_video(AVFrame* inputFrame)
         outFrame->width       = inputFrame->width;
         outFrame->height      = inputFrame->height;
         std::copy_n(inputFrame->linesize, 8, outFrame->linesize);
-        // outFrame->linesize[0]  = inputFrame->linesize[0];
         outFrame->format       = AV_PIX_FMT_YUV420P10;
         outFrame->pkt_duration = outParams.videoCodecCtx->time_base.den / (double)outParams.videoCodecCtx->time_base.num / outParams.videoStream->r_frame_rate.num * outParams.videoStream->r_frame_rate.den;
         outFrame->pts          = outFrame->pkt_duration * (nFrames++) * outParams.videoStream->time_base.den / (outParams.videoStream->time_base.num * (outParams.videoStream->r_frame_rate.num / outParams.videoStream->r_frame_rate.den));
@@ -432,10 +421,6 @@ void video_reader::video_copier::encode_video(AVFrame* inputFrame)
             throw runtime_error("ASDASAD");
         }
         outputPacket->stream_index = inParams.videoIndex;
-        // outputPacket->duration     = outParams.videoStream->time_base.den / (inParams.videoStream->r_frame_rate.num / inParams.videoStream->r_frame_rate.den);
-        // outputPacket->duration = dur;
-        // outputPacket->duration = (outParams.videoStream->time_base.den / (double)outParams.videoStream->time_base.num) / (inParams.videoStream->r_frame_rate.num / (double)inParams.videoStream->r_frame_rate.den);
-        // av_packet_rescale_ts(outputPacket, inParams.videoStream->time_base, outParams.videoStream->time_base);
 
         r = av_interleaved_write_frame(outParams.avfm, outputPacket);
         if(r != 0) throw runtime_error("ASDASD");

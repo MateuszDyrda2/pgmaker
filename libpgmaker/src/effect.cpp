@@ -1,5 +1,6 @@
 #include <libpgmaker/effect.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <vector>
 
@@ -83,21 +84,17 @@ void glsl_effect::prepare(int width, int height)
     glDeleteShader(computeShader);
     glUseProgram(programID);
     glBindTextures(0, 4, inTexs);
-    // glBindTexture(GL_TEXTURE_2D_ARRAY, inTexs);
     glUniform1i(0, 0);
     glUniform1i(1, 1);
     glUniform1i(2, 2);
     glUniform1i(3, 3);
-    // glBindImageTexture(0, inTexs, 0, GL_TRUE, 0, GL_READ_ONLY, GL_R32F);
     glBindImageTextures(0, 4, inTexs);
 
-    // glBindTexture(GL_TEXTURE_2D_ARRAY, outTexs);
     glBindTextures(4, 4, outTexs);
     glUniform1i(4, 4);
     glUniform1i(5, 5);
     glUniform1i(6, 6);
     glUniform1i(7, 7);
-    // glBindImageTexture(1, outTexs, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
     glBindImageTextures(4, 4, outTexs);
 
     set_uniforms();

@@ -87,6 +87,8 @@ class timeline
     /** @return Whether the timeline is paused */
     bool get_paused() const { return paused; }
     void set_size(const std::pair<uint32_t, uint32_t>& size);
+    void stop();
+    void start();
 
   private:
     bool paused;
@@ -108,8 +110,5 @@ class timeline
     void initialize_audio();
     void drop_audio();
     void rebuild();
-
-    void stop();
-    void start();
 };
 } // namespace libpgmaker

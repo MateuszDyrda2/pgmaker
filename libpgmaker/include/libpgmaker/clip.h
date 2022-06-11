@@ -27,6 +27,8 @@ class clip
     clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
          const milliseconds& startOffset, const milliseconds& endOffset);
     ~clip();
+    void change_video(const std::shared_ptr<video>& newVideo);
+    void add_effect_video(const std::shared_ptr<video>& newVideo);
 
     auto get_vtimebase() const { return vidTimebase; }
     auto get_atimebase() const { return audioTimebase; }
@@ -34,6 +36,8 @@ class clip
     auto get_duration() const { return vid->get_info().duration - startOffset - endOffset; }
     auto get_id() const { return clipId; }
     const auto& get_name() const { return name; }
+    const auto& get_path() const { return path; }
+    auto has_effect() const { return hasEffect; }
     const auto& get_video() const { return vid; }
     auto get_clip_info() const { return clip_info{ name, vid->get_info().path, get_duration().count() * 0.001, size.first, size.second }; }
 
@@ -67,6 +71,8 @@ class clip
   private:
     std::shared_ptr<video> vid;
     std::string name;
+    std::string path;
+    bool hasEffect;
     std::uint64_t clipId;
     milliseconds startOffset;
     milliseconds endOffset;
@@ -91,6 +97,7 @@ class clip
   private:
     friend class channel;
     void open_input(const std::string& path);
+    void close_input();
     bool open_codec(AVCodecParameters* codecParams, AVCodecContext** ctx);
     void fill_buffer();
     void seek_start();

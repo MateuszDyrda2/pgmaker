@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+
 #include <libpgmaker/video_reader.h>
 
 using namespace libpgmaker;
@@ -85,11 +86,6 @@ project::project(const std::filesystem::path& path,
     }
     size = { j.at("width").get<uint32_t>(), j.at("height").get<uint32_t>() };
     tl.set_size(size);
-
-    video_reader::copy_with_effect(
-        "/home/matzix/shared/PGMaker/build/assets/20220601_180450.mp4",
-        "/home/matzix/shared/PGMaker/build/tmp/20220601_180450tmp.mp4",
-        new grayscale);
 }
 project::project(const std::filesystem::path& path):
     videos(),
@@ -142,6 +138,33 @@ void project::load_video(const std::string& path)
         return;
     }
     videos[vid->get_info().name] = std::move(vid);
+}
+void project::add_effect(size_t channel, size_t clip, effect::effect_type type)
+{
+    effect* ef;
+    switch(type)
+    {
+    case effect::effect_type::None:
+        ef = new pass_through;
+        break;
+    case effect::effect_type::Grayscale:
+        ef = new grayscale;
+        break;
+    }
+
+    const auto& chan = tl.get_channel(channel);
+    const auto& cl   = chan->get_clip(clip);
+    tl.stop();
+    {
+        const auto& vid     = cl->get_video();
+        const auto& vidName = vid->get_info().name;
+        const auto& vidPath = std::filesystem::path(vid->get_info().path);
+        const auto& tmpPath = tmpDirectory / vidPath.filename();
+        video_reader::copy_with_effect(vidPath, tmpPath, ef);
+        auto newVid = video_reader::load_file(tmpPath).load_metadata().get();
+        cl->add_effect_video(newVid);
+    }
+    tl.start();
 }
 video_manager& project::get_videos()
 {

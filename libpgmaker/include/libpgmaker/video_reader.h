@@ -56,11 +56,11 @@ class video_reader
         };
         struct streaming_params
         {
-            char* muxer_opt_key;
-            char* muxer_opt_value;
-            char* video_codec;
-            char* codec_priv_key;
-            char* codec_priv_value;
+            std::string muxer_opt_key;
+            std::string muxer_opt_value;
+            std::string video_codec;
+            std::string codec_priv_key;
+            std::string codec_priv_value;
         };
         clip_params inParams, outParams;
         streaming_params streamingParams;
