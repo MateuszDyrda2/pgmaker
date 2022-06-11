@@ -141,30 +141,111 @@ void project::load_video(const std::string& path)
 }
 void project::add_effect(size_t channel, size_t clip, effect::effect_type type)
 {
-    effect* ef;
-    switch(type)
-    {
-    case effect::effect_type::None:
-        ef = new pass_through;
-        break;
-    case effect::effect_type::Grayscale:
-        ef = new grayscale;
-        break;
-    }
+    effectComplete = std::async(std::launch::async, [=] {
+        effect* ef;
+        switch(type)
+        {
+        case effect::effect_type::Passthrough:
+            ef = new pass_through;
+            break;
+        case effect::effect_type::Grayscale:
+            ef = new grayscale;
+            break;
+        }
 
-    const auto& chan = tl.get_channel(channel);
-    const auto& cl   = chan->get_clip(clip);
-    tl.stop();
-    {
-        const auto& vid     = cl->get_video();
-        const auto& vidName = vid->get_info().name;
-        const auto& vidPath = std::filesystem::path(vid->get_info().path);
-        const auto& tmpPath = tmpDirectory / vidPath.filename();
-        video_reader::copy_with_effect(vidPath, tmpPath, ef);
-        auto newVid = video_reader::load_file(tmpPath).load_metadata().get();
-        cl->add_effect_video(newVid);
-    }
-    tl.start();
+        const auto& chan = tl.get_channel(channel);
+        const auto& cl   = chan->get_clip(clip);
+        tl.stop();
+        {
+            const auto& vidPath = std::filesystem::path(cl->get_info().path);
+            const auto& tmpPath = tmpDirectory
+                                  / (vidPath.stem().string()
+                                     + std::to_string(cl->get_id())
+                                     + vidPath.extension().string());
+            try
+            {
+                video_reader::copy_with_effect(vidPath, tmpPath, ef);
+                auto newVid = video_reader::load_file(tmpPath).load_metadata().get();
+                cl->add_effect_video(newVid);
+            }
+            catch(const std::runtime_error& err)
+            {
+                return false;
+            }
+        }
+        tl.start();
+        return true;
+    });
+}
+void project::change_effect(size_t channel, size_t clip, libpgmaker::effect::effect_type type)
+{
+    effectComplete = std::async(std::launch::async, [=] {
+        effect* ef;
+        switch(type)
+        {
+        case effect::effect_type::Passthrough:
+            ef = new pass_through;
+            break;
+        case effect::effect_type::Grayscale:
+            ef = new grayscale;
+            break;
+        }
+        const auto& chan = tl.get_channel(channel);
+        const auto& cl   = chan->get_clip(clip);
+        tl.stop();
+        {
+            const auto& vidPath   = std::filesystem::path(cl->get_info().path);
+            const auto& assetPath = cl->get_path();
+            if(!std::filesystem::exists(assetPath)) return false;
+            auto old = videos.find(std::filesystem::path(assetPath).stem());
+            if(old == videos.end()) return false;
+            try
+            {
+                video_reader::copy_with_effect(assetPath, vidPath, ef);
+                auto newVid = video_reader::load_file(vidPath).load_metadata().get();
+                cl->change_video(newVid);
+            }
+            catch(const std::runtime_error& err)
+            {
+                return false;
+            }
+        }
+        tl.start();
+        return true;
+    });
+}
+void project::remove_effects(size_t channel, size_t clip)
+{
+    effectComplete = std::async(std::launch::async, [=] {
+        const auto& chan = tl.get_channel(channel);
+        const auto& cl   = chan->get_clip(clip);
+        tl.stop();
+        {
+            const auto& vidPath   = std::filesystem::path(cl->get_info().path);
+            const auto& assetPath = cl->get_path();
+            if(!std::filesystem::exists(assetPath))
+            {
+                return false;
+            }
+            auto old = videos.find(std::filesystem::path(assetPath).stem());
+            if(old == videos.end())
+            {
+                return false;
+            }
+			try {
+    	        cl->restore_video(old->second);
+    	        if(std::filesystem::exists(vidPath))
+    	        {
+    	            std::filesystem::remove(vidPath);
+				}
+            }
+			catch(const std::runtime_error& err)
+			{
+				return false;
+			}
+        }
+        tl.start();
+        return true; });
 }
 video_manager& project::get_videos()
 {

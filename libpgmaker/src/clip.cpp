@@ -9,9 +9,8 @@
 namespace libpgmaker {
 using namespace std;
 clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt):
-    vid(vid),
     name(vid->get_info().name), startOffset{}, endOffset{}, startsAt(startsAt),
-    size{},
+    size{}, info(vid->get_info()),
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
     swsCtx{}, vidTimebase{}, audioTimebase{}, clipId(id_generator::get_next())
@@ -19,13 +18,14 @@ clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt
     assert(vid);
     open_input(vid->get_info().path);
     audioFrame = av_frame_alloc();
+    path       = vid->get_info().path;
 }
 
 clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
            const milliseconds& startOffset, const milliseconds& endOffset):
-    vid(vid),
-    name(vid->get_info().name), startsAt(startsAt), startOffset(startOffset),
-    endOffset(endOffset), size{},
+    name(vid->get_info().name),
+    startsAt(startsAt), startOffset(startOffset),
+    endOffset(endOffset), size{}, info(vid->get_info()),
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
     swsCtx{}, vidTimebase{}, audioTimebase{}, clipId(id_generator::get_next())
@@ -33,6 +33,7 @@ clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
     assert(vid);
     open_input(vid->get_info().path);
     audioFrame = av_frame_alloc();
+    path       = vid->get_info().path;
 }
 clip::~clip()
 {
@@ -40,11 +41,15 @@ clip::~clip()
 }
 void clip::change_video(const std::shared_ptr<video>& newVideo)
 {
-    vid = newVideo;
-    assert(vid);
+    info = newVideo->get_info();
     close_input();
-    open_input(vid->get_info().path);
+    open_input(info.path);
     audioFrame = av_frame_alloc();
+}
+void clip::restore_video(const std::shared_ptr<video>& originalVideo)
+{
+    hasEffect = false;
+    change_video(originalVideo);
 }
 void clip::add_effect_video(const std::shared_ptr<video>& newVideo)
 {
@@ -164,7 +169,7 @@ void clip::change_start_offset(const milliseconds& by)
     if(startOffset + realBy < milliseconds(0))
         realBy = -startOffset;
 
-    if(startOffset + realBy > vid->get_info().duration - endOffset)
+    if(startOffset + realBy > info.duration - endOffset)
         return;
 
     startOffset += realBy;
@@ -183,7 +188,7 @@ void clip::change_end_offset(const milliseconds& by)
     if(endOffset + realBy < milliseconds(0))
         realBy = -endOffset;
 
-    if(endOffset + realBy > vid->get_info().duration - startOffset)
+    if(endOffset + realBy > info.duration - startOffset)
         return;
 
     endOffset += realBy;
@@ -221,7 +226,7 @@ bool clip::get_packet(packet& pPacket)
         vidCurrentStreamPos  = p->pos;
         vidCurrentTs         = p->pts;
         const auto millitime = chrono::duration<double>(time);
-        const auto endtime   = vid->get_info().duration - endOffset;
+        const auto endtime   = info.duration - endOffset;
         ret                  = (millitime < endtime);
     }
     else if(p->stream_index == asIndex)

@@ -7,8 +7,10 @@
 #include <libpgmaker/effect.h>
 
 #include <filesystem>
+#include <future>
 #include <libpgmaker/timeline.h>
 #include <nlohmann/json.hpp>
+#include <thread>
 
 class project;
 class project_manager
@@ -43,8 +45,11 @@ class project
     const libpgmaker::timeline& get_timeline() const;
 
     void add_effect(size_t channel, size_t clip, libpgmaker::effect::effect_type type);
+    void change_effect(size_t channel, size_t clip, libpgmaker::effect::effect_type type);
+    void remove_effects(size_t channel, size_t clip);
 
     const auto& get_size() const { return size; }
+    auto& get_effect_complete() { return effectComplete; }
 
   private:
     video_manager videos;
@@ -58,6 +63,8 @@ class project
 
     std::pair<std::uint32_t, std::uint32_t> size;
     std::size_t framerate;
+
+    std::future<bool> effectComplete;
 
   private:
     void scan_assets();

@@ -101,7 +101,7 @@ void glsl_effect::prepare(int width, int height)
 }
 void glsl_effect::process(AVFrame* inFrame, AVFrame* outFrame)
 {
-    glUseProgram(programID);
+    // glUseProgram(programID);
     for(int i = 0; i < 4; ++i)
     {
         glActiveTexture(GL_TEXTURE0 + i);
@@ -166,10 +166,10 @@ void pass_through::prepare(int width, int height)
 }
 void pass_through::process(AVFrame* inFrame, AVFrame* outFrame)
 {
-    std::copy_n(inFrame->data[0], width * 4 * height, outFrame->data[0]);
-    std::copy_n(inFrame->data[1], width * 4 * height, outFrame->data[1]);
-    std::copy_n(inFrame->data[2], width * 4 * height, outFrame->data[2]);
-    std::copy_n(inFrame->data[3], width * 4 * height, outFrame->data[3]);
+    std::copy_n(inFrame->data[0], inFrame->linesize[0] * height, outFrame->data[0]);
+    std::copy_n(inFrame->data[1], inFrame->linesize[1] * height, outFrame->data[1]);
+    std::copy_n(inFrame->data[2], inFrame->linesize[2] * height, outFrame->data[2]);
+    std::copy_n(inFrame->data[3], inFrame->linesize[3] * height, outFrame->data[3]);
 }
 void pass_through::cleanup()
 {

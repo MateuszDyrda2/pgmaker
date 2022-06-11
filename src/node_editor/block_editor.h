@@ -1,7 +1,10 @@
 #pragma once
 
+#include "command_handler.h"
 #include <deque>
+#include <libpgmaker/effect.h>
 #include <list>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -21,9 +24,9 @@ struct effect_block : public block
     ImVec2 lastDelta{ 0.f, 0.f };
     bool isBeingDragged = false;
     connection* attachedTo{ nullptr };
-    const char* currentItem = NULL;
+    const char* currentItem = libpgmaker::effect::effectNames[0];
 
-    bool interact();
+    bool interact(bool& remove, std::queue<command>& pendingCommands);
 };
 struct connection
 {
@@ -34,11 +37,13 @@ struct connection
     size_t channelIdx, clipHandle;
 
     void draw(ImDrawList* drawList, ImVec2 windowPos, ImVec2 windowSize);
-    void interact(size_t& i, std::list<effect_block>& freeEffects);
-    void add_effect(effect_block* ef);
-    void remove_effect(effect_block* ef);
+    void add_effect(effect_block* ef, std::queue<command>& pendingCommands);
+    void remove_effect(effect_block* ef, std::queue<command>& pendingCommands);
 
     bool is_contained(ImVec2 pos);
+
+  private:
+    void recalc_effects();
 };
 class block_editor
 {
@@ -53,9 +58,11 @@ class block_editor
 
     void add_effect();
     void add_connection(size_t channelIdx, size_t clipHandle);
+    void remove_connection(size_t channelIdx, size_t clipHandle);
     void draw();
 
   private:
     std::deque<connection> connections;
     std::list<effect_block> effects;
+    std::queue<command> pendingCommands;
 };

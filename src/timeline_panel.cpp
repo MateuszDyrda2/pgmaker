@@ -62,6 +62,19 @@ timeline_panel::timeline_panel():
                 std::tuple<std::size_t, std::size_t, effect::effect_type>*>(c.data);
             proj->add_effect(i, j, type);
         });
+    command_handler::listen(
+        "RemoveEffects",
+        [proj](command& c) {
+            auto&& [i, j] = *reinterpret_cast<std::pair<std::size_t, std::size_t>*>(c.data);
+            proj->remove_effects(i, j);
+        });
+    command_handler::listen(
+        "ChangeEffect",
+        [proj](command& c) {
+            auto&& [i, j, type] = *reinterpret_cast<
+                std::tuple<std::size_t, std::size_t, effect::effect_type>*>(c.data);
+            proj->change_effect(i, j, type);
+        });
 }
 timeline_panel::~timeline_panel()
 {

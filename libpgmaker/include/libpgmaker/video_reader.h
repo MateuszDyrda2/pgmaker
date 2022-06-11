@@ -1,5 +1,8 @@
 #pragma once
 
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+
 #include "video.h"
 #include <libpgmaker/pg_types.h>
 
@@ -35,6 +38,7 @@ class video_reader
     struct video_copier
     {
         video_copier(effect* ef);
+        ~video_copier();
         void open_input(const std::string& path);
         void open_output(const std::string& path);
         void process();
@@ -66,6 +70,8 @@ class video_reader
         streaming_params streamingParams;
         effect* ef;
         AVFrame *inBuffer, *outBuffer;
+        GLFWwindow* handle;
+        size_t nFrames{ 0 };
     };
 
   public:

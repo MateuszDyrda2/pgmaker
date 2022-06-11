@@ -7,10 +7,11 @@ namespace libpgmaker {
 class effect
 {
   public:
-    static constexpr char const* effectNames[] = { "none", "Grayscale" };
+    static constexpr char const* effectNames[] = { "none", "Passthrough", "Grayscale" };
     enum class effect_type
     {
         None,
+        Passthrough,
         Grayscale
     };
 

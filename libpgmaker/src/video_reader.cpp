@@ -178,11 +178,25 @@ void video_reader::copy_with_effect(
 video_reader::video_copier::video_copier(effect* ef):
     ef(ef)
 {
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
+    if(!(handle = glfwCreateWindow(100, 100, "slave0", NULL, NULL)))
+    {
+        throw runtime_error("Could not create a slave window");
+    }
+    glfwMakeContextCurrent(handle);
+
     streamingParams.video_codec      = "libx264";
     streamingParams.codec_priv_key   = "x264-params";
     streamingParams.codec_priv_value = "keyint=60:min-keyint=60:scenecut=0:force-cfr=1";
     streamingParams.muxer_opt_key    = "movflags";
     streamingParams.muxer_opt_value  = "frag_keyframe+empty_moov+delay_moov+default_base_moof";
+}
+video_reader::video_copier::~video_copier()
+{
+    glfwDestroyWindow(handle);
 }
 void video_reader::video_copier::open_input(const std::string& path)
 {
@@ -257,9 +271,14 @@ void video_reader::video_copier::open_input(const std::string& path)
 }
 void video_reader::video_copier::open_output(const std::string& path)
 {
+    auto realPath = std::filesystem::path(path);
+    if(std::filesystem::exists(realPath)) std::filesystem::remove(realPath);
+
     avformat_alloc_output_context2(&outParams.avfm, NULL, NULL, path.c_str());
     prepare_video_encoder();
     prepare_audio_encoder();
+
+    // outParams.avfm->avoid_negative_ts = AVFMT_AVOID_NEG_TS_MAKE_NON_NEGATIVE;
 
     if(outParams.avfm->oformat->flags & AVFMT_GLOBALHEADER)
         outParams.avfm->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -280,9 +299,8 @@ void video_reader::video_copier::prepare_video_encoder()
     outParams.videoStream   = avformat_new_stream(outParams.avfm, NULL);
     outParams.videoCodec    = avcodec_find_encoder_by_name(streamingParams.video_codec.c_str());
     outParams.videoCodecCtx = avcodec_alloc_context3(outParams.videoCodec);
-    AVDictionary* dict      = NULL;
-    av_opt_set(dict, "preset", "fast", 0);
-    av_opt_set(dict, streamingParams.codec_priv_key.c_str(), streamingParams.codec_priv_value.c_str(), 0);
+    av_opt_set(outParams.videoCodecCtx->priv_data, "preset", "fast", 0);
+    av_opt_set(outParams.videoCodecCtx->priv_data, streamingParams.codec_priv_key.c_str(), streamingParams.codec_priv_value.c_str(), 0);
 
     outParams.videoCodecCtx->height              = inParams.videoCodecCtx->height;
     outParams.videoCodecCtx->width               = inParams.videoCodecCtx->width;
@@ -292,9 +310,15 @@ void video_reader::video_copier::prepare_video_encoder()
     else
         outParams.videoCodecCtx->pix_fmt = inParams.videoCodecCtx->pix_fmt;
 
+    /////
+    outParams.videoCodecCtx->max_b_frames = 1;
+    outParams.videoCodecCtx->gop_size     = 12;
+
     outParams.videoStream->time_base = outParams.videoCodecCtx->time_base = av_inv_q(inputFramerate);
-    outParams.videoStream->r_frame_rate                                   = inParams.videoStream->r_frame_rate;
-    if(avcodec_open2(outParams.videoCodecCtx, outParams.videoCodec, &dict) < 0) throw runtime_error("ASDASD");
+    // outParams.videoStream->r_frame_rate                                   = inParams.videoStream->r_frame_rate;
+    outParams.videoStream->r_frame_rate = inputFramerate;
+    outParams.videoCodecCtx->framerate  = inputFramerate;
+    if(avcodec_open2(outParams.videoCodecCtx, outParams.videoCodec, NULL) < 0) throw runtime_error("ASDASD");
     avcodec_parameters_from_context(outParams.videoStream->codecpar, outParams.videoCodecCtx);
     outParams.swsCtx = nullptr;
     outParams.swsCtx = sws_getCachedContext(outParams.swsCtx, inParams.videoCodecCtx->width, inParams.videoCodecCtx->height,
@@ -304,7 +328,7 @@ void video_reader::video_copier::prepare_video_encoder()
 void video_reader::video_copier::process()
 {
     AVDictionary* muxer_opts = NULL;
-    av_dict_set(&muxer_opts, streamingParams.muxer_opt_key.c_str(), streamingParams.muxer_opt_value.c_str(), 0);
+    // av_dict_set(&muxer_opts, streamingParams.muxer_opt_key.c_str(), streamingParams.muxer_opt_value.c_str(), 0);
 
     if(avformat_write_header(outParams.avfm, &muxer_opts) < 0) throw runtime_error("ASDASD");
     auto inputFrame  = av_frame_alloc();
@@ -379,10 +403,10 @@ void video_reader::video_copier::encode_video(AVFrame* inputFrame)
         ef->process(inBuffer, outBuffer);
 
         ///////////////////////////////////////////////////////////////////
-        static size_t nFrames = 0;
-        outFrame              = av_frame_alloc();
-        outFrame->width       = inputFrame->width;
-        outFrame->height      = inputFrame->height;
+        outFrame = av_frame_alloc();
+        av_frame_copy_props(outFrame, inputFrame);
+        outFrame->width  = inputFrame->width;
+        outFrame->height = inputFrame->height;
         std::copy_n(inputFrame->linesize, 8, outFrame->linesize);
         outFrame->format       = AV_PIX_FMT_YUV420P10;
         outFrame->pkt_duration = outParams.videoCodecCtx->time_base.den / (double)outParams.videoCodecCtx->time_base.num / outParams.videoStream->r_frame_rate.num * outParams.videoStream->r_frame_rate.den;
