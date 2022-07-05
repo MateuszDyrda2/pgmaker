@@ -95,7 +95,8 @@ void clip::open_input(const string& path)
         if(streams->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
             vsIndex = i;
-            size    = { streams->codecpar->width, streams->codecpar->height };
+            size    = { std::uint32_t(streams->codecpar->width),
+                     std::uint32_t(streams->codecpar->height) };
         }
         else if(streams->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
@@ -118,8 +119,8 @@ void clip::open_input(const string& path)
     }
 
     // convert to rgba
-    swsCtx = sws_getContext(size.first, size.second, pVideoCodecCtx->pix_fmt,
-                            size.first, size.second, AV_PIX_FMT_RGB0,
+    swsCtx = sws_getContext(size.width, size.height, pVideoCodecCtx->pix_fmt,
+                            size.width, size.height, AV_PIX_FMT_RGB0,
                             SWS_BILINEAR, NULL, NULL, NULL);
     if(!swsCtx)
     {
@@ -266,9 +267,9 @@ bool clip::get_frame(packet& pPacket, AVFrame** frame)
 void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
 {
     // auto buff             = new std::uint8_t[width * height * 4];
-    std::vector<std::uint8_t> buff(size.first * size.second * 4);
+    std::vector<std::uint8_t> buff(size.width * size.height * 4);
     std::uint8_t* dest[4] = { buff.data(), nullptr, nullptr, nullptr };
-    int destLineSize[4]   = { int(size.first) * 4, 0, 0, 0 };
+    int destLineSize[4]   = { int(size.width) * 4, 0, 0, 0 };
     sws_scale(swsCtx, iFrame->data, iFrame->linesize,
               0, iFrame->height,
               dest, destLineSize);

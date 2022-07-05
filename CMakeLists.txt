@@ -23,6 +23,8 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 project(pgmaker VERSION ${pgmaker_VERSION} LANGUAGES CXX)
 
+find_package(Lua51 REQUIRED)
+
 add_subdirectory(lib/glfw)
 add_subdirectory(libpgmaker)
 add_subdirectory(lib/imgui)
@@ -38,6 +40,7 @@ FetchContent_declare(
 FetchContent_MakeAvailable(json)
 
 
+
 add_executable(pgmaker 
 	src/main.cpp
 	src/main_menu_panel.cpp
@@ -48,8 +51,10 @@ add_executable(pgmaker
 	src/node_editor_panel.cpp
 	src/node_editor/block_editor.cpp
 	src/project.cpp
+	src/project_creator.cpp
 	src/main_application.cpp
 	src/welcome_screen.cpp
+	src/lua_binding.cpp
 )
 
 target_link_libraries(pgmaker
@@ -60,9 +65,11 @@ target_link_libraries(pgmaker
 	libpgmaker
 	imgui
 	nlohmann_json::nlohmann_json
+	${LUA_LIBRARIES}
 )
 
 target_include_directories(
 	pgmaker 
 	PUBLIC src
+	lib/luabridge3
 )

@@ -30,14 +30,7 @@ void welcome_screen::update()
     {
         if(ImGui::Button("Create new project"))
         {
-            NFD::UniquePath outPath;
-            NFD_FILTER_ITEM a = { "PGMaker projects", "pgproj" };
-            auto result       = NFD::SaveDialog(outPath, &a, 1, NULL, "NewProject.pgproj");
-            if(result == NFD_OKAY)
-            {
-                command_handler::send({ "CreateProject", new std::string(outPath.get()) });
-                command_handler::send({ "StartApplication" });
-            }
+            command_handler::send({ "StartProjectCreation" });
             ImGui::CloseCurrentPopup();
         }
         if(ImGui::Button("Load project"))

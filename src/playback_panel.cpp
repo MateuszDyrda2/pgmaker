@@ -11,8 +11,11 @@ playback_panel::~playback_panel()
 }
 void playback_panel::draw()
 {
-    auto proj = project_manager::get_current_project();
-    auto& tl  = proj->get_timeline();
+    auto proj         = project_manager::get_current_project();
+    auto& tl          = proj->get_timeline();
+    auto rFramerate   = std::chrono::duration<float>(proj->get_r_framerate());
+    auto rProjectSize = proj->get_r_size();
+    auto projectSize  = proj->get_size();
 
     float videoOptHeight = 60.f;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f });
@@ -22,22 +25,20 @@ void playback_panel::draw()
     {
         auto vppos  = ImGui::GetWindowPos();
         auto vpsize = ImGui::GetContentRegionAvail();
-        // ImGui::SetNextWindowPos(vppos);
-        // ImGui::SetNextWindowSize({ vpsize.x, vpsize.y - videoOptHeight });
         ImGui::BeginChild("VideoRender", { vpsize.x, vpsize.y - videoOptHeight });
         {
             ////////////////////////
             auto pos     = ImGui::GetWindowPos();
             auto size    = ImGui::GetContentRegionAvail();
-            auto xScaler = size.x / proj->get_size().first;
-            auto yScaler = size.y / proj->get_size().second;
+            auto xScaler = size.x * rProjectSize.first;
+            auto yScaler = size.y * rProjectSize.second;
 
             auto&& [textures, nbTextures] = tl.next_frame();
             while(nbTextures-- > 0)
             {
                 auto& tex       = textures[nbTextures];
-                auto texScaledW = tex.size.first * xScaler;
-                auto texScaledH = tex.size.second * yScaler;
+                auto texScaledW = tex.size.width * xScaler;
+                auto texScaledH = tex.size.height * yScaler;
                 ImGui::SetCursorPos({ (size.x - texScaledW) * 0.5f,
                                       (size.y - texScaledH) * 0.5f });
                 ImGui::Image(
@@ -47,8 +48,6 @@ void playback_panel::draw()
             ////////////////////////
         }
         ImGui::EndChild();
-        // ImGui::SetNextWindowPos({ vppos.x, vppos.y + vpsize.y - videoOptHeight });
-        // ImGui::SetNextWindowSize({ vpsize.x, videoOptHeight });
         ImGui::BeginChild("VideoOpts", { vpsize.x, videoOptHeight });
         {
             constexpr auto buttonSize    = 40.f;

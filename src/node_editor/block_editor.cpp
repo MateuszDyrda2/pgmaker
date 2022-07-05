@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "../lua_binding.h"
 #include "project.h"
 
 using namespace std;
@@ -75,44 +76,55 @@ bool effect_block::interact(bool& remove, std::queue<command>& pendingCommands)
     ImGui::SetItemAllowOverlap();
     ImGui::SetCursorPos({ pos.x + 20, pos.y + (block_editor::nodeSize.y * 0.5f) - 10 });
     ImGui::SetNextItemWidth(block_editor::nodeSize.x - 40.f);
-    if(ImGui::BeginCombo("##combo", currentItem))
+    if(ImGui::BeginCombo("##combo", currentItem.c_str()))
     {
-        for(size_t i = 0; i < IM_ARRAYSIZE(effect::effectNames); ++i)
+        auto proj = project_manager::get_current_project();
+        auto& em  = proj->get_effect_mananger();
+        for(auto&& [name, effect] : em.get_available_effects())
         {
-            bool isSelected = (currentItem == effect::effectNames[i]);
-            if(ImGui::Selectable(effect::effectNames[i], &isSelected))
+            bool isSelected = (currentItem == name);
+            if(ImGui::Selectable(name.c_str(), &isSelected))
             {
                 if(attachedTo)
                 {
-                    if(currentItem != effect::effectNames[0])
+                    if(currentItem != "None")
                     {
-                        if(i == 0)
+                        if(currentItem != name)
                         {
                             pendingCommands.push(
                                 { "RemoveEffects",
                                   new std::pair(
                                       attachedTo->channelIdx, attachedTo->clipHandle) });
-                        }
-                        else if(currentItem != effect::effectNames[i])
-                        {
-                            pendingCommands.push(
-                                { "ChangeEffect",
-                                  new std::tuple(
-                                      attachedTo->channelIdx, attachedTo->clipHandle, effect::effect_type(i)) });
+                            currentItem = name;
+                            for(auto& f : attachedTo->effects)
+                            {
+                                if(f->currentItem != "None")
+                                {
+                                    pendingCommands.push(
+                                        { "AttachEffect",
+                                          new std::tuple(
+                                              attachedTo->channelIdx,
+                                              attachedTo->clipHandle,
+                                              f->currentItem) });
+                                }
+                            }
                         }
                     }
                     else
                     {
+                        currentItem = name;
                         pendingCommands.push(
                             { "AttachEffect",
                               new std::tuple(
-                                  attachedTo->channelIdx, attachedTo->clipHandle, effect::effect_type(i)) });
+                                  attachedTo->channelIdx,
+                                  attachedTo->clipHandle,
+                                  currentItem) });
                     }
                 }
-                currentItem = effect::effectNames[i];
             }
             if(isSelected)
             {
+                currentItem = name;
                 ImGui::SetItemDefaultFocus();
             }
         }
@@ -172,23 +184,13 @@ void connection::add_effect(effect_block* ef, std::queue<command>& pendingComman
     effects.push_back(ef);
     ef->color = 0xFFAA2200;
     recalc_effects();
-    if(ef->currentItem != effect::effectNames[0])
+    if(ef->currentItem != "None")
     {
         int found = 0;
-        for(size_t i = 1; i < IM_ARRAYSIZE(effect::effectNames); ++i)
-        {
-            if(ef->currentItem == effect::effectNames[i])
-            {
-                found = i;
-                break;
-            }
-        }
-        if(found != 0)
-        {
-            pendingCommands.push({ "AttachEffect",
-                                   new std::tuple(
-                                       channelIdx, clipHandle, effect::effect_type(found)) });
-        }
+        pendingCommands.push(
+            { "AttachEffect",
+              new std::tuple(
+                  channelIdx, clipHandle, ef->currentItem) });
     }
 }
 void connection::remove_effect(effect_block* ef, std::queue<command>& pendingCommands)
@@ -197,23 +199,18 @@ void connection::remove_effect(effect_block* ef, std::queue<command>& pendingCom
     ef->attachedTo = nullptr;
     effects.erase(std::remove(effects.begin(), effects.end(), ef));
     recalc_effects();
-    if(ef->currentItem != effect::effectNames[0])
+    if(ef->currentItem != "None")
     {
         pendingCommands.push(
             { "RemoveEffects",
               new std::pair(channelIdx, clipHandle) });
         for(auto& f : effects)
         {
-            size_t i = 1;
-            for(; i < IM_ARRAYSIZE(effect::effectNames); ++i)
-            {
-                if(effect::effectNames[i] == f->currentItem) break;
-            }
-            if(f->currentItem != effect::effectNames[0])
+            if(f->currentItem != "None")
             {
                 pendingCommands.push(
                     { "AttachEffect",
-                      new std::tuple(channelIdx, clipHandle, effect::effect_type(i)) });
+                      new std::tuple(channelIdx, clipHandle, f->currentItem) });
             }
         }
     }

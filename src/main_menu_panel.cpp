@@ -1,6 +1,8 @@
 #include "main_menu_panel.h"
 
 #include "command_handler.h"
+#include "lua_binding.h"
+
 #include <nfd.hpp>
 
 #include <fstream>
@@ -56,6 +58,16 @@ void main_menu_panel::draw()
                 if(result == NFD_OKAY)
                 {
                     command_handler::send({ "LoadProject", new std::string(outPath.get()) });
+                }
+            }
+            if(ImGui::MenuItem("Add effect script"))
+            {
+                NFD::UniquePath outPath;
+                auto result = NFD::OpenDialog(outPath);
+                if(result == NFD_OKAY)
+                {
+                    auto& em = project_manager::get_current_project()->get_effect_mananger();
+                    em.add_effect(new lua_effect(outPath.get()));
                 }
             }
             if(ImGui::MenuItem("Exit"))

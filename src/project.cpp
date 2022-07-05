@@ -7,10 +7,11 @@
 
 using namespace libpgmaker;
 std::unique_ptr<project> project_manager::loadedProject;
-project* project_manager::create_project(const std::string& path)
+project* project_manager::create_project(const std::string& path,
+                                         float framerate, std::uint32_t width, std::uint32_t height)
 {
     // TODO: MEMORY LEAK!!!!
-    loadedProject = std::make_unique<project>(path);
+    loadedProject = std::make_unique<project>(path, framerate, width, height);
     return loadedProject.get();
 }
 project* project_manager::load_project(const std::string& path)
@@ -84,12 +85,15 @@ project::project(const std::filesystem::path& path,
             }
         }
     }
-    size = { j.at("width").get<uint32_t>(), j.at("height").get<uint32_t>() };
+    size       = pixel_size{ j.at("width").get<uint32_t>(), j.at("height").get<uint32_t>() };
+    framerate  = j.at("framerate").get<float>();
+    rSize      = { 1.f / size.width, 1.f / size.height };
+    rFramerate = 1.f / framerate;
     tl.set_size(size);
 }
-project::project(const std::filesystem::path& path):
-    videos(),
-    tl(),
+project::project(const std::filesystem::path& path, float framerate, std::uint32_t width, std::uint32_t height):
+    videos(), framerate(framerate), size{ width, height },
+    tl(), rFramerate(1 / framerate), rSize(1.f / width, 1.f / height),
     path(path)
 {
     workingDirectory = path.parent_path();
@@ -98,7 +102,6 @@ project::project(const std::filesystem::path& path):
     std::filesystem::create_directory(tmpDirectory);
     std::filesystem::create_directory(assetDirectory);
     name = path.stem().string();
-    size = { 1920, 1080 };
 }
 project::~project()
 {
@@ -139,19 +142,10 @@ void project::load_video(const std::string& path)
     }
     videos[vid->get_info().name] = std::move(vid);
 }
-void project::add_effect(size_t channel, size_t clip, effect::effect_type type)
+void project::add_effect(size_t channel, size_t clip, const std::string& type)
 {
-    effectComplete = std::async(std::launch::async, [=] {
-        effect* ef;
-        switch(type)
-        {
-        case effect::effect_type::Passthrough:
-            ef = new pass_through;
-            break;
-        case effect::effect_type::Grayscale:
-            ef = new grayscale;
-            break;
-        }
+    effectComplete = std::async(std::launch::async, [this, channel, clip, type] {
+        effect* ef = em.get_available_effects()[type]->instantiate();
 
         const auto& chan = tl.get_channel(channel);
         const auto& cl   = chan->get_clip(clip);
@@ -177,48 +171,12 @@ void project::add_effect(size_t channel, size_t clip, effect::effect_type type)
         return true;
     });
 }
-void project::change_effect(size_t channel, size_t clip, libpgmaker::effect::effect_type type)
-{
-    effectComplete = std::async(std::launch::async, [=] {
-        effect* ef;
-        switch(type)
-        {
-        case effect::effect_type::Passthrough:
-            ef = new pass_through;
-            break;
-        case effect::effect_type::Grayscale:
-            ef = new grayscale;
-            break;
-        }
-        const auto& chan = tl.get_channel(channel);
-        const auto& cl   = chan->get_clip(clip);
-        tl.stop();
-        {
-            const auto& vidPath   = std::filesystem::path(cl->get_info().path);
-            const auto& assetPath = cl->get_path();
-            if(!std::filesystem::exists(assetPath)) return false;
-            auto old = videos.find(std::filesystem::path(assetPath).stem());
-            if(old == videos.end()) return false;
-            try
-            {
-                video_reader::copy_with_effect(assetPath, vidPath, ef);
-                auto newVid = video_reader::load_file(vidPath).load_metadata().get();
-                cl->change_video(newVid);
-            }
-            catch(const std::runtime_error& err)
-            {
-                return false;
-            }
-        }
-        tl.start();
-        return true;
-    });
-}
 void project::remove_effects(size_t channel, size_t clip)
 {
     effectComplete = std::async(std::launch::async, [=] {
         const auto& chan = tl.get_channel(channel);
         const auto& cl   = chan->get_clip(clip);
+		if(!cl->has_effect())	return true;
         tl.stop();
         {
             const auto& vidPath   = std::filesystem::path(cl->get_info().path);
@@ -288,6 +246,7 @@ void to_json(json& j, const timeline& tl)
 void to_json(json& j, const project& pr)
 {
     j = { { "timeline", pr.get_timeline() },
-          { "width", pr.get_size().first },
-          { "height", pr.get_size().second } };
+          { "width", pr.get_size().width },
+          { "height", pr.get_size().height },
+          { "framerate", pr.get_framerate() } };
 }

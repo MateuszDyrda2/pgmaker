@@ -76,6 +76,9 @@ class video_reader
 
   public:
     static video_handle load_file(const std::string& path);
+    static void export_clip(
+        class clip* c,
+        const std::string& path);
 
     static void copy_with_effect(
         const std::string& in,

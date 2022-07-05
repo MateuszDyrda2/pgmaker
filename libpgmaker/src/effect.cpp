@@ -22,6 +22,22 @@ message_callback(
 }
 
 namespace libpgmaker {
+effect_manager::effect_manager()
+{
+    availableEffects["grayscale"]    = new grayscale;
+    availableEffects["pass_through"] = new pass_through;
+}
+effect_manager::~effect_manager()
+{
+    for(auto&& [key, val] : availableEffects)
+    {
+        delete val;
+    }
+}
+void effect_manager::add_effect(effect* ef)
+{
+    availableEffects[ef->get_name()] = ef;
+}
 void glsl_effect::prepare(int width, int height)
 {
     this->width  = width;
@@ -52,8 +68,8 @@ void glsl_effect::prepare(int width, int height)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
-    const char* shaderSource = get_shader();
-    int computeShader        = glCreateShader(GL_COMPUTE_SHADER);
+    const char* shaderSource   = get_shader();
+    unsigned int computeShader = glCreateShader(GL_COMPUTE_SHADER);
     glShaderSource(computeShader, 1, &shaderSource, nullptr);
     glCompileShader(computeShader);
     GLint ret = 0;

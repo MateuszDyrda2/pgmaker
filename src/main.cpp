@@ -6,6 +6,7 @@
 #include "command_handler.h"
 #include "events.h"
 #include "main_application.h"
+#include "project_creator.h"
 #include "welcome_screen.h"
 
 #if defined(WIN32)
@@ -76,6 +77,10 @@ int main()
         [&](command& c) { application = std::make_unique<main_application>(); });
 
     command_handler::listen(
+        "StartProjectCreation",
+        [&](command& c) { application = std::make_unique<project_creator>(); });
+
+    command_handler::listen(
         "ExitApplication",
         [&](command& c) { shouldRun = false; });
 
@@ -83,10 +88,11 @@ int main()
         "CreateProject",
         [](command& c) {
             {
-                auto path = *reinterpret_cast<std::string*>(c.data);
+                auto [path, framerate, width, height] =
+                    *reinterpret_cast<std::tuple<std::string, float, int, int>*>(c.data);
                 try
                 {
-                    project_manager::create_project(path);
+                    project_manager::create_project(path, framerate, width, height);
                 }
                 catch(const std::runtime_error& err)
                 {

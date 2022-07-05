@@ -2,6 +2,15 @@
 
 #include "command_handler.h"
 #include "events.h"
+#include <libpgmaker/video_reader.h>
+
+#include <nfd.hpp>
+
+#if defined(WIN32)
+#    define NFD_FILTER_ITEM nfdu8filteritem_t
+#else
+#    define NFD_FILTER_ITEM nfdnfilteritem_t
+#endif
 
 using namespace libpgmaker;
 timeline_panel::timeline_panel():
@@ -59,7 +68,7 @@ timeline_panel::timeline_panel():
         "AttachEffect",
         [proj](command& c) {
             auto&& [i, j, type] = *reinterpret_cast<
-                std::tuple<std::size_t, std::size_t, effect::effect_type>*>(c.data);
+                std::tuple<std::size_t, std::size_t, std::string>*>(c.data);
             proj->add_effect(i, j, type);
         });
     command_handler::listen(
@@ -67,13 +76,6 @@ timeline_panel::timeline_panel():
         [proj](command& c) {
             auto&& [i, j] = *reinterpret_cast<std::pair<std::size_t, std::size_t>*>(c.data);
             proj->remove_effects(i, j);
-        });
-    command_handler::listen(
-        "ChangeEffect",
-        [proj](command& c) {
-            auto&& [i, j, type] = *reinterpret_cast<
-                std::tuple<std::size_t, std::size_t, effect::effect_type>*>(c.data);
-            proj->change_effect(i, j, type);
         });
 }
 timeline_panel::~timeline_panel()
@@ -220,6 +222,20 @@ void timeline_panel::draw_clip(libpgmaker::timeline& tl,
           clipXMax = xmin + edDiv * (xmax - xmin);
     ImGui::SetCursorPos({ clipXMin, (channelHeight + channelMargin) * i });
     ImGui::InvisibleButton("", { clipXMax - clipXMin, channelHeight });
+
+    if(ImGui::BeginPopupContextItem("##popup", 1))
+    {
+        if(ImGui::MenuItem("Export"))
+        {
+            NFD::UniquePath outPath;
+            auto result = NFD::SaveDialog(outPath, NULL, 0, NULL, "clip.mp4");
+            if(result == NFD_OKAY)
+            {
+                video_reader::export_clip(cl.get(), outPath.get());
+            }
+        }
+        ImGui::EndPopup();
+    }
 
     bool isItemActive    = ImGui::IsItemActive();
     bool isMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);

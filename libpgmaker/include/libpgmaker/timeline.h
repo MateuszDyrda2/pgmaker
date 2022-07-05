@@ -13,7 +13,7 @@ class timeline
     struct texture_t
     {
         unsigned int handle;
-        std::pair<unsigned int, unsigned int> size;
+        pixel_size size;
     };
 
   public:
@@ -24,12 +24,8 @@ class timeline
     using duration     = channel::duration;
 
   public:
-    /** @brief Create a timeline specifying the settings.
-     * The settings can be changed at any moment
-     * @param settings project settings
-     */
+    /** @brief Create a timeline */
     timeline();
-    timeline(std::deque<std::unique_ptr<channel>>&& channels);
     timeline(timeline&& other) noexcept;
     timeline& operator=(timeline&& other) noexcept;
     ~timeline();
@@ -58,14 +54,39 @@ class timeline
     /** @return Returns all channels */
     std::deque<std::unique_ptr<channel>>& get_channels();
     /** @brief Move playback forward and get the current frame.
-     * @return pointer to the requested frame
+     *  @return vector containing textures and number of new textures
      */
     std::pair<const std::vector<texture_t>&, std::size_t> next_frame();
-    bool add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at);
-    bool add_clip(std::size_t ch, const std::shared_ptr<video>& vid, const milliseconds& at,
+    std::pair<const std::vector<texture_t>&, std::size_t> next_frame_blocking(const milliseconds& ts);
+    // void export_timeline(const std::string& path, int64_t framerate);
+    /** @brief Add a clip to a timeline to a specified channel at time
+     * @param channelHandle handle of the channel to add the clip to
+     * @param vid video to take the clip from
+     * @param at timestamp the clip should start at
+     * @return true if the action was a success
+     */
+    bool add_clip(std::size_t channelHandle, const std::shared_ptr<video>& vid, const milliseconds& at);
+    /** @brief Add a clip to a timeline to a specified channel at time
+     * @param channelHandle handle of the channel to add the clip to
+     * @param vid video to take the clip from
+     * @param at timestamp the clip should start at
+     * @param startOffset offset into the video the clip should start at
+     * @param endOffset offset into the end of the video the clip should end at
+     * @return true if the action was a success
+     */
+    bool add_clip(std::size_t channelHandle, const std::shared_ptr<video>& vid, const milliseconds& at,
                   const milliseconds& startOffset, const milliseconds& endOffset);
-    void append_clip(std::size_t ch, const std::shared_ptr<video>& vid);
-    void move_clip(std::size_t ch, std::size_t cl, const milliseconds& to);
+    /** @brief Append a clip onto the end of the channels clips
+     * @param channelHandle handle of the channel to add the clip to
+     * @param vid video to take the clip from
+     */
+    void append_clip(std::size_t channelHandle, const std::shared_ptr<video>& vid);
+    /** @brief Move the clip in a channel to a specified timestamp
+     * @param channelHandle handle of the channel containing the clip
+     * @param clipHandle handle of the clip to move
+     * @param to timestamp the clip should be moved to
+     */
+    void move_clip(std::size_t channelHandle, std::size_t clipHandle, const milliseconds& to);
     /** @brief Set the channel to be paused / unpaused
      * @param value should channel be paused
      */
@@ -85,9 +106,14 @@ class timeline
     /** @return Duration of the whole timeline */
     milliseconds get_duration() const;
     /** @return Whether the timeline is paused */
-    bool get_paused() const { return paused; }
-    void set_size(const std::pair<uint32_t, uint32_t>& size);
+    auto get_paused() const { return paused; }
+    /** @brief Change the resolution of the project
+     * @param size new resolution
+     */
+    void set_size(const pixel_size& size);
+    /** @brief Stop all channels playback */
     void stop();
+    /** @brief Restart all channels states and playback */
     void start();
 
   private:
@@ -97,7 +123,7 @@ class timeline
     milliseconds ts;
     time_point tsChecked;
 
-    std::pair<uint32_t, uint32_t> size;
+    pixel_size size;
     std::vector<texture_t> textures;
 
   private:

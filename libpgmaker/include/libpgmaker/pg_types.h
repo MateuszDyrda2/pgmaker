@@ -16,6 +16,23 @@ extern "C"
 #include <vector>
 
 namespace libpgmaker {
+struct pixel_size
+{
+    std::uint32_t width, height;
+
+    pixel_size& operator+=(const pixel_size& other);
+    pixel_size& operator-=(const pixel_size& other);
+    pixel_size& operator*=(std::uint32_t value);
+    pixel_size& operator/=(std::uint32_t value);
+};
+pixel_size operator+(const pixel_size& lhs, const pixel_size& rhs);
+pixel_size operator-(const pixel_size& lhs, const pixel_size& rhs);
+pixel_size operator*(const pixel_size& lhs, std::uint32_t rhs);
+pixel_size operator*(std::uint32_t lhs, const pixel_size& rhs);
+pixel_size operator/(const pixel_size& lhs, std::uint32_t rhs);
+bool operator==(const pixel_size& lhs, const pixel_size& rhs);
+bool operator!=(const pixel_size& lhs, const pixel_size& rhs);
+
 struct frame
 {
     class clip* owner;

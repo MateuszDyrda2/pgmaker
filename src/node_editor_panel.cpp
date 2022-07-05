@@ -32,9 +32,6 @@ void node_editor_panel::draw()
 {
     if(ImGui::Begin("NodeEditor"))
     {
-        // auto drawList = ImGui::GetWindowDrawList();
-        // blockEditor->interact();
-        // blockEditor->draw(drawList);
         editor.draw();
     }
     ImGui::End();

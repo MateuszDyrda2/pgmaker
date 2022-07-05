@@ -24,7 +24,8 @@ struct effect_block : public block
     ImVec2 lastDelta{ 0.f, 0.f };
     bool isBeingDragged = false;
     connection* attachedTo{ nullptr };
-    const char* currentItem = libpgmaker::effect::effectNames[0];
+    // const char* currentItem = libpgmaker::effect::effectNames[0];
+    std::string currentItem = "None";
 
     bool interact(bool& remove, std::queue<command>& pendingCommands);
 };
