@@ -8,3 +8,6 @@ build/
 CMakeLists.txt.user
 CMakeSettings.json
 .cache
+out/
+
+libpgmaker/doc/

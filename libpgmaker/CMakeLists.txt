@@ -81,7 +81,7 @@ else()
 endif()
 
 
-add_subdirectory(lib/glad)
+add_subdirectory(lib/glad2)
 add_subdirectory(lib/glm)
 add_subdirectory(lib/portaudio)
 
@@ -108,13 +108,12 @@ FetchContent_MakeAvailable(readerwriterqueue)
 
 set(libpgmaker_SRC
 	src/video_reader.cpp
-	src/textureGL.cpp
 	src/clip.cpp
 	src/channel.cpp
 	src/timeline.cpp
 	src/video.cpp
-	src/preview.cpp
 	src/pg_types.cpp
+	src/effect.cpp
 )
 add_library(libpgmaker STATIC ${libpgmaker_SRC})
 
@@ -129,7 +128,6 @@ if(WIN32)
 else()
     set(GLM_LIB glm)
 endif()
-
 
 target_link_libraries(libpgmaker
 	PUBLIC

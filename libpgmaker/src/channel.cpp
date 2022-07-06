@@ -1,5 +1,6 @@
 #include <libpgmaker/channel.h>
 
+#include <libpgmaker/id_generator.h>
 #include <libpgmaker/timeline.h>
 
 #include <algorithm>
@@ -8,33 +9,22 @@
 #include <iostream>
 #include <thread>
 
+#include <glad/glad.h>
+
 namespace libpgmaker {
 using namespace std;
 using namespace chrono_literals;
-channel::channel(const timeline* tl):
+channel::channel(const timeline* tl, std::size_t index):
     currentClip{ clips.end() }, prevFrame{},
     nextFrame{}, stopped{ true }, paused{ false },
     tl(tl), audioStream{}, lenght(0),
     videoPacketQueue(64), audioPacketQueue(64),
-    frameQueue(64)
+    frameQueue(64), index(index), channelId(id_generator::get_next()),
+    muted(false)
 {
     silentBuffer.resize(NB_CHANNELS * NB_FRAMES, 0.f);
     audioBuffer.resize(NB_CHANNELS * NB_FRAMES);
     set_paused(true);
-}
-channel::channel(std::deque<std::unique_ptr<clip>>&& clips):
-    clips{ std::move(clips) }, currentClip{ clips.end() },
-    prevFrame{}, nextFrame{}, stopped{ true }, paused{ false },
-    audioStream{}, lenght(0), videoPacketQueue{ 64 },
-    audioPacketQueue(64), frameQueue(64)
-{
-    silentBuffer.resize(NB_CHANNELS * NB_FRAMES, 0.f);
-    audioBuffer.resize(NB_CHANNELS * NB_FRAMES);
-    set_paused(true);
-}
-void channel::set_timeline(const timeline* tl)
-{
-    this->tl = tl;
 }
 channel::~channel()
 {
@@ -50,50 +40,51 @@ bool channel::add_clip(const shared_ptr<video>& vid, const chrono::milliseconds&
     recalculate_lenght();
     return true;
 }
+bool channel::add_clip(const std::shared_ptr<video>& vid, const milliseconds& at,
+                       const milliseconds& startOffset, const milliseconds& endOffset)
+{
+    clips.emplace_back(make_unique<clip>(vid, at, startOffset, endOffset));
+    currentClip = clips.begin();
+    recalculate_lenght();
+    return true;
+}
 bool channel::append_clip(const std::shared_ptr<video>& vid)
 {
     return add_clip(vid, lenght);
 }
-clip* channel::get_clip(std::size_t index)
+clip* channel::get_clip(std::size_t clipId)
 {
-    auto it = clips.begin();
-    std::advance(it, index);
-    return it->get();
+    auto ret = std::find_if(clips.begin(), clips.end(), [clipId](const auto& cl) {
+        return cl->get_id() == clipId;
+    });
+    if(ret == clips.end())
+        return nullptr;
+    return ret->get();
 }
-const clip* channel::get_clip(std::size_t index) const
+const clip* channel::get_clip(std::size_t clipId) const
 {
-    auto it = clips.begin();
-    std::advance(it, index);
-    return it->get();
+    auto ret = std::find_if(clips.begin(), clips.end(), [clipId](const auto& cl) {
+        return cl->get_id() == clipId;
+    });
+    if(ret == clips.end())
+        return nullptr;
+    return ret->get();
 }
-clip* channel::operator[](std::size_t index)
+clip* channel::operator[](std::size_t clipId)
 {
-    return get_clip(index);
+    return get_clip(clipId);
 }
-const clip* channel::operator[](std::size_t index) const
+const clip* channel::operator[](std::size_t clipId) const
 {
-    return get_clip(index);
+    return get_clip(clipId);
 }
-std::deque<std::unique_ptr<clip>>& channel::get_clips()
-{
-    return clips;
-}
-const std::deque<std::unique_ptr<clip>>& channel::get_clips() const
-{
-    return clips;
-}
-frame* channel::next_frame(const duration& timestamp, bool paused)
+frame* channel::next_frame(const duration& timestamp)
 {
     if(timestamp > lenght)
     {
         return nullptr;
     }
-    if(paused) return prevFrame;
-    if(!nextFrame)
-    {
-        if(!frameQueue.try_dequeue(nextFrame))
-            return nullptr;
-    }
+    if(!nextFrame && !frameQueue.try_dequeue(nextFrame)) return nullptr;
 
     auto pts = nextFrame->timestamp;
     if(timestamp >= pts)
@@ -105,9 +96,46 @@ frame* channel::next_frame(const duration& timestamp, bool paused)
                 delete prevFrame;
                 prevFrame = nextFrame;
             }
-            if(!frameQueue.try_dequeue(nextFrame)) break;
+            if(!frameQueue.try_dequeue(nextFrame)) return nullptr;
             pts = nextFrame->timestamp;
         }
+    }
+    if(prevFrame)
+    {
+        if(timestamp < prevFrame->owner->get_starts_at()
+           || timestamp > prevFrame->owner->get_ends_at())
+        {
+            prevFrame = nullptr;
+        }
+    }
+
+    return prevFrame;
+}
+frame* channel::next_frame_blocking(const duration& timestamp)
+{
+    if(timestamp > lenght) return nullptr;
+    if(!nextFrame)
+    {
+        frameQueue.wait_dequeue(nextFrame);
+    }
+    auto pts = nextFrame->timestamp;
+    if(timestamp >= pts)
+    {
+        while(timestamp > pts)
+        {
+            if(prevFrame != nextFrame)
+            {
+                delete prevFrame;
+                prevFrame = nextFrame;
+            }
+            frameQueue.wait_dequeue_timed(nextFrame, milliseconds(20));
+            pts = nextFrame->timestamp;
+        }
+    }
+    if(prevFrame)
+    {
+        if(timestamp < prevFrame->owner->get_start_offset()
+           || timestamp > prevFrame->owner->get_ends_at()) { prevFrame = nullptr; }
     }
     return prevFrame;
 }
@@ -192,10 +220,6 @@ void channel::decoding_job()
                 {
                     audioPacketQueue.enqueue(std::move(_packet));
                 }
-                else
-                {
-                    _packet.unref();
-                }
             }
             else
             {
@@ -236,13 +260,31 @@ void channel::video_job()
         }
         nbNoop = 0;
         auto c = _packet.owner;
-        if(c->get_frame(_packet, &pFrame))
+        ////
+        int response = avcodec_send_packet(c->pVideoCodecCtx, _packet.payload);
+        if(response < 0) throw runtime_error("ASDASD");
+        while(response >= 0)
         {
-            auto fr = new frame;
-            c->convert_frame(pFrame, &fr);
-            while(!stopped && !frameQueue.wait_enqueue_timed(fr, 10ms))
-                ;
+            response = avcodec_receive_frame(c->pVideoCodecCtx, pFrame);
+            if(response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+                break;
+            else if(response < 0)
+                throw runtime_error("ASDA");
+            if(response >= 0)
+            {
+                auto fr = new frame;
+                c->convert_frame(pFrame, &fr);
+                while(!stopped && !frameQueue.wait_enqueue_timed(fr, 10ms))
+                    ;
+            }
         }
+        // if(c->get_frame(_packet, &pFrame))
+        //{
+        //     auto fr = new frame;
+        //     c->convert_frame(pFrame, &fr);
+        //     while(!stopped && !frameQueue.wait_enqueue_timed(fr, 10ms))
+        //         ;
+        // }
     }
     av_frame_free(&pFrame);
 }
@@ -323,7 +365,7 @@ int channel::audio_stream_callback(
     auto out                                           = static_cast<float*>(output);
 
     int sampleCount = frameCount;
-    if(paused)
+    if(paused || muted)
     {
         // if the channel is paused => fill the buffer with silence
         std::copy_n(silentBuffer.begin(), sampleCount * NB_CHANNELS, out);
@@ -365,10 +407,8 @@ int channel::audio_stream_callback(
 
 void channel::move_clip(std::size_t index, const milliseconds& to)
 {
-    assert(index < clips.size());
-
     if(to < 0ms) return;
-    auto cl = std::next(clips.begin(), index)->get();
+    auto cl = get_clip(index);
 
     auto end     = to + cl->get_duration();
     auto canMove = std::find_if(
@@ -381,7 +421,20 @@ void channel::move_clip(std::size_t index, const milliseconds& to)
         });
     if(canMove != clips.end()) return;
 
-    cl->move_to(to);
+    cl->set_starts_at(to);
+
+    reorder_clips();
     recalculate_lenght();
 }
-} // namespace libpgmaker
+void channel::reorder_clips()
+{
+    std::sort(clips.begin(), clips.end(),
+              [](const auto& lhs, const auto& rhs) {
+                  return lhs->get_starts_at() < rhs->get_starts_at();
+              });
+}
+void channel::set_muted(bool value)
+{
+    muted = value;
+}
+}

@@ -1,3 +1,5 @@
+/** @file */
+
 #pragma once
 
 #include <chrono>
@@ -6,6 +8,7 @@
 #include <string>
 
 namespace libpgmaker {
+/** Metadata of the video */
 struct video_info
 {
     std::string name;
@@ -16,14 +19,16 @@ struct video_info
     int pixelFormat;
     int codecId;
 };
+/** Video class for a video file */
 class video
 {
   public:
     video();
     video(const video_info& info, std::unique_ptr<std::uint8_t[]>&& tn);
     ~video();
-
+    /** @return information about the video */
     const video_info& get_info() const { return information; }
+    /** @return video thumbnail if loaded */
     unsigned int get_texture() const;
 
   private:

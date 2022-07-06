@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <libpgmaker/clip.h>
+#include <libpgmaker/id_generator.h>
 
 #include <cassert>
 #include <stdexcept>
@@ -8,41 +9,71 @@
 namespace libpgmaker {
 using namespace std;
 clip::clip(const std::shared_ptr<video>& vid, std::chrono::milliseconds startsAt):
-    vid(vid), name(vid->get_info().name), startOffset{}, endOffset{}, startsAt(startsAt),
-    width{}, height{},
+    name(vid->get_info().name), startOffset{}, endOffset{}, startsAt(startsAt),
+    size{}, info(vid->get_info()),
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
-    swsCtx{}, vidTimebase{}, audioTimebase{}
+    swsCtx{}, vidTimebase{}, audioTimebase{}, clipId(id_generator::get_next())
 {
     assert(vid);
     open_input(vid->get_info().path);
+    audioFrame = av_frame_alloc();
+    path       = vid->get_info().path;
 }
 
-clip::clip(const std::string& name, const milliseconds& startsAt,
+clip::clip(const std::shared_ptr<video>& vid, const milliseconds& startsAt,
            const milliseconds& startOffset, const milliseconds& endOffset):
-    vid(),
-    name(name), startsAt(startsAt), startOffset(startOffset),
-    endOffset(endOffset), width{}, height{},
+    name(vid->get_info().name),
+    startsAt(startsAt), startOffset(startOffset),
+    endOffset(endOffset), size{}, info(vid->get_info()),
     pFormatCtx{}, pVideoCodecCtx{}, pAudioCodecCtx{},
     vsIndex{ -1 }, asIndex{ -1 },
-    swsCtx{}, vidTimebase{}, audioTimebase{}
+    swsCtx{}, vidTimebase{}, audioTimebase{}, clipId(id_generator::get_next())
 {
-}
-void clip::assign_video(const std::shared_ptr<video>& vid)
-{
-    assert(vid->get_info().name == name);
-    this->vid = vid;
+    assert(vid);
     open_input(vid->get_info().path);
+    audioFrame = av_frame_alloc();
+    path       = vid->get_info().path;
 }
-
 clip::~clip()
 {
+    close_input();
+}
+void clip::change_video(const std::shared_ptr<video>& newVideo)
+{
+    info = newVideo->get_info();
+    close_input();
+    open_input(info.path);
+    audioFrame = av_frame_alloc();
+}
+void clip::restore_video(const std::shared_ptr<video>& originalVideo)
+{
+    hasEffect = false;
+    change_video(originalVideo);
+}
+void clip::add_effect_video(const std::shared_ptr<video>& newVideo)
+{
+    hasEffect = true;
+    change_video(newVideo);
+}
+void clip::close_input()
+{
+    av_frame_free(&audioFrame);
     swr_free(&swrCtx);
     sws_freeContext(swsCtx);
     avcodec_free_context(&pVideoCodecCtx);
     avcodec_free_context(&pAudioCodecCtx);
     avformat_close_input(&pFormatCtx);
     avformat_free_context(pFormatCtx);
+
+    audioFrame          = nullptr;
+    swrCtx              = nullptr;
+    swsCtx              = nullptr;
+    pVideoCodecCtx      = nullptr;
+    pAudioCodecCtx      = nullptr;
+    pFormatCtx          = nullptr;
+    vidCurrentStreamPos = 0;
+    vidCurrentTs        = 0;
 }
 void clip::open_input(const string& path)
 {
@@ -64,8 +95,8 @@ void clip::open_input(const string& path)
         if(streams->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
             vsIndex = i;
-            width   = streams->codecpar->width;
-            height  = streams->codecpar->height;
+            size    = { std::uint32_t(streams->codecpar->width),
+                     std::uint32_t(streams->codecpar->height) };
         }
         else if(streams->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
@@ -88,8 +119,8 @@ void clip::open_input(const string& path)
     }
 
     // convert to rgba
-    swsCtx = sws_getContext(width, height, pVideoCodecCtx->pix_fmt,
-                            width, height, AV_PIX_FMT_RGB0,
+    swsCtx = sws_getContext(size.width, size.height, pVideoCodecCtx->pix_fmt,
+                            size.width, size.height, AV_PIX_FMT_RGB0,
                             SWS_BILINEAR, NULL, NULL, NULL);
     if(!swsCtx)
     {
@@ -124,18 +155,44 @@ bool clip::open_codec(AVCodecParameters* codecParams, AVCodecContext** ctx)
     }
     return false;
 }
-void clip::move_to(const milliseconds& startsAt)
+void clip::set_starts_at(const milliseconds& startsAt)
 {
     this->startsAt = startsAt;
 }
-void clip::change_start_offset(const milliseconds& startOffset)
+void clip::set_start_offset(const milliseconds& startOffset)
 {
     this->startOffset = startOffset;
     seek_start();
 }
-void clip::change_end_offset(const milliseconds& endOffset)
+void clip::change_start_offset(const milliseconds& by)
+{
+    auto realBy = by;
+    if(startOffset + realBy < milliseconds(0))
+        realBy = -startOffset;
+
+    if(startOffset + realBy > info.duration - endOffset)
+        return;
+
+    startOffset += realBy;
+    startsAt += realBy;
+
+    // seek_impl(startOffset);
+    // seek_start();
+}
+void clip::set_end_offset(const milliseconds& endOffset)
 {
     this->endOffset = endOffset;
+}
+void clip::change_end_offset(const milliseconds& by)
+{
+    auto realBy = by;
+    if(endOffset + realBy < milliseconds(0))
+        realBy = -endOffset;
+
+    if(endOffset + realBy > info.duration - startOffset)
+        return;
+
+    endOffset += realBy;
 }
 void clip::seek_start()
 {
@@ -148,7 +205,9 @@ void clip::seek_start()
 }
 void clip::reset()
 {
-    seek_start();
+    // seek_start();
+    flush();
+    seek_impl(startOffset);
 }
 bool clip::get_packet(packet& pPacket)
 {
@@ -160,48 +219,67 @@ bool clip::get_packet(packet& pPacket)
     {
         return true;
     }
+    double time = 0;
+    bool ret    = true;
+    if(p->stream_index == vsIndex)
+    {
+        time                 = p->pts * vidTimebase.num / (double)vidTimebase.den;
+        vidCurrentStreamPos  = p->pos;
+        vidCurrentTs         = p->pts;
+        const auto millitime = chrono::duration<double>(time);
+        const auto endtime   = info.duration - endOffset;
+        ret                  = (millitime < endtime);
+    }
+    else if(p->stream_index == asIndex)
+    {
+        time = p->pts * audioTimebase.num / (double)audioTimebase.den;
+    }
+    pPacket.owner   = this;
+    pPacket.payload = p;
 
-    const auto time      = p->pts * vidTimebase.num / (double)vidTimebase.den;
-    const auto millitime = chrono::duration<double>(time);
-    const auto endtime   = vid->get_info().duration - endOffset;
-    vidCurrentStreamPos  = p->pos;
-    vidCurrentTs         = p->pts;
-    pPacket.owner        = this;
-    pPacket.payload      = p;
-    return (millitime < endtime);
+    return ret;
 }
 bool clip::get_frame(packet& pPacket, AVFrame** frame)
 {
-    if(avcodec_send_packet(pVideoCodecCtx, pPacket.payload) < 0)
+    int response = avcodec_send_packet(pVideoCodecCtx, pPacket.payload);
+    if(response < 0)
     {
         throw runtime_error("Failed to decode a packet");
     }
-    if(int response = avcodec_receive_frame(pVideoCodecCtx, *frame);
+    while(response >= 0)
+    {
+        response = avcodec_receive_frame(pVideoCodecCtx, *frame);
+        if(response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+            return false;
+        else if(response < 0)
+            runtime_error("Failed to decode a packet");
+    }
+    if(response = avcodec_receive_frame(pVideoCodecCtx, *frame);
        response == AVERROR(EAGAIN) || response == AVERROR_EOF)
     {
         return false;
     }
     else if(response < 0)
     {
-        throw runtime_error("Failed to decode a packet");
     }
     return true;
 }
 void clip::convert_frame(AVFrame* iFrame, frame** oFrame)
 {
     // auto buff             = new std::uint8_t[width * height * 4];
-    std::vector<std::uint8_t> buff(width * height * 4);
+    std::vector<std::uint8_t> buff(size.width * size.height * 4);
     std::uint8_t* dest[4] = { buff.data(), nullptr, nullptr, nullptr };
-    int destLineSize[4]   = { int(width) * 4, 0, 0, 0 };
+    int destLineSize[4]   = { int(size.width) * 4, 0, 0, 0 };
     sws_scale(swsCtx, iFrame->data, iFrame->linesize,
               0, iFrame->height,
               dest, destLineSize);
 
-    (*oFrame)->size   = { width, height };
+    (*oFrame)->owner  = this;
     (*oFrame)->data   = std::move(buff);
     const auto pts    = iFrame->pts * vidTimebase.num / double(vidTimebase.den);
     const auto ts     = chrono::duration_cast<milliseconds>(chrono::duration<double>(pts));
     const auto realTs = startsAt - startOffset + ts;
+    av_frame_unref(iFrame);
 
     (*oFrame)->timestamp = realTs;
 }
@@ -217,11 +295,10 @@ std::size_t clip::get_audio_frame(packet* pPacket, vector<float>& b)
     // may contain multiple frames
     for(;;)
     {
-        AVFrame* frame = av_frame_alloc();
-        if(int response = avcodec_receive_frame(pAudioCodecCtx, frame);
+        //        AVFrame* frame = av_frame_alloc();
+        if(int response = avcodec_receive_frame(pAudioCodecCtx, audioFrame);
            response == AVERROR(EAGAIN) || response == AVERROR_EOF)
         {
-            av_frame_free(&frame);
             break;
         }
         else if(response < 0)
@@ -231,13 +308,13 @@ std::size_t clip::get_audio_frame(packet* pPacket, vector<float>& b)
         float* buffer[] = { ptr };
 
         auto cSamples = swr_convert(swrCtx, (std::uint8_t**)buffer,
-                                    frame->nb_samples,
-                                    const_cast<const std::uint8_t**>(frame->extended_data),
-                                    frame->nb_samples);
+                                    audioFrame->nb_samples,
+                                    const_cast<const std::uint8_t**>(audioFrame->extended_data),
+                                    audioFrame->nb_samples);
         std::advance(ptr, cSamples * nbChannels);
         bSize += cSamples;
 
-        av_frame_free(&frame);
+        av_frame_unref(audioFrame);
     }
 
     return bSize;
@@ -252,13 +329,17 @@ bool clip::seek(const milliseconds& ts)
     assert(ts >= startsAt);
     assert(ts <= startsAt + get_duration());
 
+    auto realTs = ts - startsAt + startOffset;
+    return seek_impl(realTs);
+}
+bool clip::seek_impl(const milliseconds& localTs)
+{
     auto currentPos = video_convert_pts(vidCurrentTs);
-    auto realTs     = ts - startsAt + startOffset;
-    auto diff       = realTs - currentPos;
+    auto diff       = localTs - currentPos;
 
     const auto currentPosInSec = chrono::duration_cast<chrono::duration<double>>(currentPos);
     const auto diffInSec       = chrono::duration_cast<chrono::duration<double>>(diff);
-    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(realTs);
+    const auto reqInSec        = chrono::duration_cast<chrono::duration<double>>(localTs);
 
     std::int64_t curr = currentPosInSec.count() * AV_TIME_BASE;
     std::int64_t inc  = diffInSec.count() * AV_TIME_BASE;
@@ -298,5 +379,18 @@ std::int64_t clip::video_reconvert_pts(const milliseconds& pts) const
 {
     const auto regTs = chrono::duration_cast<chrono::duration<double>>(pts - startsAt + startOffset);
     return regTs.count() * vidTimebase.den / (double)vidTimebase.num;
+}
+void clip::flush()
+{
+    // if(avcodec_send_packet(pVideoCodecCtx, NULL) < 0) return;
+    // AVFrame* f = av_frame_alloc();
+
+    // int ret = 0;
+    // while((ret = avcodec_receive_frame(pVideoCodecCtx, f) >= 0))
+    //     ;
+    // av_frame_free(&f);
+
+    avcodec_flush_buffers(pVideoCodecCtx);
+    avcodec_flush_buffers(pAudioCodecCtx);
 }
 }
