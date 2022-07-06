@@ -1,3 +1,5 @@
+/** @file */
+
 #pragma once
 
 #define GLFW_INCLUDE_NONE
@@ -12,6 +14,7 @@
 #include <string>
 
 namespace libpgmaker {
+/** Class for operations with video files */
 class video_reader
 {
   public:
@@ -75,11 +78,19 @@ class video_reader
     };
 
   public:
+    /** @brief Loads a video file
+     * @param path path to a file
+     * @return handle to the loader
+     */
     static video_handle load_file(const std::string& path);
     static void export_clip(
         class clip* c,
         const std::string& path);
-
+    /** @brief Copies a video clip to a new file with effect attached
+     * @param in path to input video file
+     * @param out path to output
+     * @param ef pointer to effect
+     */
     static void copy_with_effect(
         const std::string& in,
         const std::string& out,

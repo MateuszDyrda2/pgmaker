@@ -108,7 +108,6 @@ FetchContent_MakeAvailable(readerwriterqueue)
 
 set(libpgmaker_SRC
 	src/video_reader.cpp
-	src/textureGL.cpp
 	src/clip.cpp
 	src/channel.cpp
 	src/timeline.cpp

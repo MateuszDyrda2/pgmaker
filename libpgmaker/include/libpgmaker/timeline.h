@@ -1,7 +1,8 @@
+/** @file */
+
 #pragma once
 
 #include "channel.h"
-#include "project_settings.h"
 
 #include <deque>
 

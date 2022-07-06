@@ -1,3 +1,5 @@
+/** @file */
+
 #pragma once
 
 #include "pg_types.h"
